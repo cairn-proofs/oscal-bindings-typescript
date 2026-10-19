@@ -48,7 +48,7 @@
 
 ## 7. Report
 
-- [ ] 7.1 Write the answers to the four questions of #1 in `tmp/report.md`, with the evidence from tasks 2 to 5. The
+- [x] 7.1 Write the answers to the four questions of #1 in `tmp/report.md`, with the evidence from tasks 2 to 5. The
       evidence is the gap count, the union exclusion of design.md D4, the global names of task 5.2, and the fetch and
       validation result. Verify that the user approved the text.
-- [ ] 7.2 Post the approved report as a comment on #1. Verify that the comment is on the issue.
+- [x] 7.2 Post the approved report as a comment on #1. Verify that the comment is on the issue.
