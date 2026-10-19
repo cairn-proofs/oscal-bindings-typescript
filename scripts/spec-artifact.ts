@@ -108,12 +108,15 @@ export async function ensureSpecArtifact(options: EnsureOptions = {}): Promise<s
     }
     const root = path.join(out, pin.top);
     fs.writeFileSync(path.join(root, ".complete"), `${pin.sha256}\n`);
-    fs.rmSync(target, { recursive: true, force: true });
-    try {
-      fs.renameSync(root, target);
-    } catch (error) {
-      // node --test runs test files in parallel, so another process can publish the same checked artifact first.
-      if (!fs.existsSync(path.join(target, ".complete"))) throw error;
+    // Never remove a published directory: another process (node --test runs files in parallel) can be reading it.
+    // The rename is atomic, so a published directory is always complete. If another process published first, its
+    // copy holds the same checked bytes, and this copy is discarded with the work directory.
+    if (!fs.existsSync(path.join(target, ".complete"))) {
+      try {
+        fs.renameSync(root, target);
+      } catch (error) {
+        if (!fs.existsSync(path.join(target, ".complete"))) throw error;
+      }
     }
   } finally {
     fs.rmSync(work, { recursive: true, force: true });

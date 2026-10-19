@@ -80,3 +80,12 @@ test("a member that is not in the archive fails and publishes nothing", async ()
   await assert.rejects(ensureSpecArtifact({ pin: missing, cacheRoot, download: async () => bytes }), SpecArtifactError);
   assert.deepEqual(fs.readdirSync(cacheRoot), []);
 });
+
+test("parallel misses publish once and never remove a published directory", async () => {
+  const { bytes, pin, cacheRoot } = fixture();
+  const download = async () => bytes;
+  const roots = await Promise.all(Array.from({ length: 8 }, () => ensureSpecArtifact({ pin, cacheRoot, download })));
+  assert.equal(new Set(roots).size, 1);
+  for (const root of roots) assert.ok(fs.existsSync(path.join(root, "manifest", "names.json")));
+  assert.deepEqual(fs.readdirSync(cacheRoot), [path.basename(roots[0])]);
+});
