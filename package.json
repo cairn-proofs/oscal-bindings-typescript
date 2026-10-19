@@ -1,0 +1,28 @@
+{
+  "name": "oscal-bindings-typescript",
+  "private": true,
+  "description": "Typed TypeScript data bindings for OSCAL, generated from the NIST JSON Schema and the oscal-bindings-specs naming manifest. Not published yet.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": "24.22.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts",
+    "artifact": "tsx scripts/spec-artifact.ts",
+    "generate": "tsx scripts/generate.ts --write",
+    "generate:check": "tsx scripts/generate.ts",
+    "types:check": "tsc -p tsconfig.types.json",
+    "fixtures": "tsx scripts/type-fixtures.ts",
+    "global-names": "tsx scripts/global-names.ts",
+    "validate": "openspec validate --all --strict",
+    "check": "npm run typecheck && npm run test && npm run generate:check && npm run fixtures && npm run types:check && npm run global-names && npm run validate"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "ajv": "8.20.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}
