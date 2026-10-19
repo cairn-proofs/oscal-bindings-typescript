@@ -157,15 +157,16 @@ global. A second compile of the generated file with `DOM` in `lib` shows that th
 5. The global-names probe.
 6. `openspec validate --all --strict`.
 
-Tests use `node:test` through `tsx --test`, which adds no dependency. `.github/workflows/build.yml` copies the store build job: the same pinned actions, `contents: read`, no persisted
-credentials, `timeout-minutes`, and `npm ci`.
+Tests use `node:test` through `tsx --test`, which adds no dependency. `.github/workflows/build.yml` copies the store
+build job: the same pinned actions, `contents: read`, no persisted credentials, `timeout-minutes`, and `npm ci`.
 
 ## Risks / Trade-offs
 
 1. [The TypeScript 7 package does not hold `lib.*.d.ts` files at a known path] → The probe in D6 uses only the
    compiler. It does not read lib files.
 2. [The corpus covers few branches, so some union shapes stay untested] → The negative cases in D5 cover the union
-   exclusion directly. The report lists which unions the corpus documents reach.
+   exclusion directly. The valid corpus documents reach 11 of the 13 unions. They do not reach `InsertControls` or
+   `ProfileGroup`.
 3. [A gap is real but rare, and the corpus does not reach it] → D3 does not depend on the corpus. The walk visits every
    property of every entry, so it finds each gap in the schema.
 4. [The spike code becomes the binding code without review] → The full binding is a separate change. It can keep or
@@ -174,10 +175,12 @@ credentials, `timeout-minutes`, and `npm ci`.
 
 ## Migration Plan
 
-1. Merge this change to `main` after the report is posted on #1.
-2. If the report finds a format gap, the store change `define-names-manifest-format` gets an update and release
+1. Post the report on #1.
+2. Archive this change on the feature branch. The change has no spec deltas, so the archive only moves the change
+   directory. Then merge the pull request, so that `main` gets the code and the archived change in one merge.
+3. If the report finds a format gap, the store change `define-names-manifest-format` gets an update and release
    `0.3.0+oscal.1.2.3`. This repo then moves its pin in a follow-up change.
-3. If the report finds no gap, the store archives `define-names-manifest-format`.
+4. If the report finds no gap, the store archives `define-names-manifest-format`.
 
 **Rollback:** close the pull request. No other repo depends on this one.
 
