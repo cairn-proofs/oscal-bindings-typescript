@@ -43,7 +43,7 @@
 
 ## 6. Gate and CI
 
-- [ ] 6.1 Add the `npm run check` script and `.github/workflows/build.yml` (design.md D7). Verify that
+- [x] 6.1 Add the `npm run check` script and `.github/workflows/build.yml` (design.md D7). Verify that
       `npm run check` passes locally from an empty `.cache/`, and that the CI run on pull request #2 passes.
 
 ## 7. Report
