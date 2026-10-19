@@ -104,9 +104,9 @@ and the check gate fails when the committed file differs from a new run.
 ### D4 — Unions exclude the properties of other branches with `never`
 
 A TypeScript union of object types accepts an object with the properties of two branches, because the excess property
-check applies to the union as a whole. The schema rejects that object (Context, item 4). Each variant gets an optional `never` property
-for the distinguishing property of each other variant. TypeScript then rejects that object too. An object with only
-shared properties stays valid, as the `anyOf` allows.
+check applies to the union as a whole. The schema rejects that object (Context, item 4). Each variant gets an
+optional `never` property for the distinguishing property of each other variant. TypeScript then rejects that object
+too. An object with only shared properties stays valid, as the `anyOf` allows.
 
 - **Consequence for the format:** the variant `property` is enough data for this. But [MDL-006] calls it a
   distinguishing property, and in `catalog:group` the property is optional. A reader can take it for a required tag.
@@ -156,8 +156,8 @@ global. A second compile of the generated file with `DOM` in `lib` shows that th
 4. The type fixtures, then `tsc --noEmit` on the generated file and the type tests.
 5. The global-names probe.
 6. `openspec validate --all --strict`.
- Tests use `node:test` through `tsx --test`, which adds no dependency.
-`.github/workflows/build.yml` copies the store build job: the same pinned actions, `contents: read`, no persisted
+
+Tests use `node:test` through `tsx --test`, which adds no dependency. `.github/workflows/build.yml` copies the store build job: the same pinned actions, `contents: read`, no persisted
 credentials, `timeout-minutes`, and `npm ci`.
 
 ## Risks / Trade-offs
