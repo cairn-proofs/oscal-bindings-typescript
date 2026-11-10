@@ -12,8 +12,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
-export const SPEC_ARTIFACT_VERSION = "0.2.0+oscal.1.2.3";
-export const SPEC_ARTIFACT_SHA256 = "3bc746e8a6182a612c2a8f397e0ee7a47b2d777108f93df81dcd139ee59b271e";
+export const SPEC_ARTIFACT_VERSION = "0.7.0+oscal.1.2.3";
+export const SPEC_ARTIFACT_SHA256 = "39f61f5c40200882106d9df6367d5aa5ccc6d604288741a8a70e93e119fa933e";
 /** The OSCAL release, from the build metadata of the version. */
 export const OSCAL_RELEASE = SPEC_ARTIFACT_VERSION.split("+oscal.")[1];
 
@@ -31,7 +31,9 @@ export const MEMBERS = [
   `schemas/${OSCAL_RELEASE}/oscal_complete_schema.json`,
   `manifest/${OSCAL_RELEASE}/names.json`,
   "manifest/names.schema.json",
-  `corpus/${OSCAL_RELEASE}/documents`,
+  `corpus/${OSCAL_RELEASE}`,
+  "openspec/requirements.json",
+  "openspec/traceability.schema.json",
 ] as const;
 
 export const DEFAULT_CACHE_ROOT = path.resolve(".cache/spec-artifact");
@@ -131,7 +133,11 @@ export function artifactPaths(root: string) {
     schema: path.join(root, "schemas", OSCAL_RELEASE, "oscal_complete_schema.json"),
     names: path.join(root, "manifest", OSCAL_RELEASE, "names.json"),
     namesSchema: path.join(root, "manifest", "names.schema.json"),
+    corpus: path.join(root, "corpus", OSCAL_RELEASE),
     documents: path.join(root, "corpus", OSCAL_RELEASE, "documents"),
+    cases: path.join(root, "corpus", OSCAL_RELEASE, "cases.json"),
+    requirements: path.join(root, "openspec", "requirements.json"),
+    traceabilitySchema: path.join(root, "openspec", "traceability.schema.json"),
   };
 }
 
