@@ -96,3 +96,54 @@ test("an open enum accepts an off-list value of its base datatype, and a closed 
 test("the module load and the compile of each validator write nothing to the console", () => {
   assert.deepEqual(consoleCalls, []);
 });
+
+test("each distinct pattern of the schema compiles with the pattern engine", () => {
+  const patterns = new Set<string>();
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node === null || typeof node !== "object") return;
+    const object = node as Record<string, unknown>;
+    if (typeof object.pattern === "string") patterns.add(object.pattern);
+    Object.values(object).forEach(walk);
+  };
+  walk(schema);
+  assert.ok(patterns.size > 0);
+  for (const pattern of patterns) assert.doesNotThrow(() => validators.regExpEngine(pattern, "u"), pattern);
+});
+
+test("the pattern of StringDatatype follows the XSD meaning of white space and of the dot", () => {
+  const definitions = (schema as { definitions: Record<string, { pattern?: string }> }).definitions;
+  const pattern = definitions["StringDatatype"]?.pattern;
+  assert.equal(typeof pattern, "string");
+  const regExp = validators.regExpEngine(pattern as string, "u");
+  assert.equal(regExp.test("\u3000a"), true);
+  assert.equal(regExp.test("a\u2028b"), true);
+  assert.equal(regExp.test(" a"), false);
+  assert.equal(regExp.test("a\n"), false);
+});
+
+test("the pattern engine throws for a white space escape inside a character class", () => {
+  assert.throws(() => validators.regExpEngine("^[\\s]+$", "u"), /character class/);
+  assert.throws(() => validators.regExpEngine("^[^\\S]+$", "u"), /character class/);
+  assert.doesNotThrow(() => validators.regExpEngine("^[a-z\\]]\\s$", "u"));
+});
+
+test("documentValidators returns a validator pair for each root key", () => {
+  assert.equal(validators.rootKeys.length, 8);
+  for (const key of validators.rootKeys) {
+    const pair = validators.documentValidators(key);
+    assert.equal(typeof pair.failFast, "function", key);
+    assert.equal(typeof pair.full, "function", key);
+  }
+  assert.throws(() => validators.documentValidators("catalog-document"), /not a root key/);
+});
+
+test("the fail-fast validator stops at the first error", () => {
+  const c = loadCorpus(paths.corpus).cases.find((x) => x.id === "parse/two-failures")!;
+  const input = JSON.parse(fs.readFileSync(path.join(paths.corpus, c.input), "utf8")) as unknown;
+  const pair = validators.documentValidators("catalog");
+  assert.equal(pair.failFast(input), false);
+  assert.equal(pair.failFast.errors?.length, 1);
+  assert.equal(pair.full(input), false);
+  assert.ok((pair.full.errors?.length ?? 0) >= 2);
+});

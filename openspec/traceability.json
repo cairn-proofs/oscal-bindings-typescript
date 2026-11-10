@@ -1,4 +1,93 @@
 {
   "format": 1,
-  "operations": []
+  "operations": [
+    {
+      "name": "parse",
+      "requirements": [
+        "PRS-001",
+        "PRS-004",
+        "PRS-005",
+        "PRS-006",
+        "PRS-007",
+        "PRS-008",
+        "PRS-009",
+        "PRS-010",
+        "PRS-011",
+        "PRS-012",
+        "PRS-013",
+        "ERR-001",
+        "ERR-003",
+        "ERR-004"
+      ]
+    },
+    {
+      "name": "parseFile",
+      "requirements": [
+        "PRS-002",
+        "ERR-006"
+      ]
+    },
+    {
+      "name": "parseCatalog",
+      "requirements": [
+        "PRS-003",
+        "ERR-005"
+      ]
+    },
+    {
+      "name": "parseMappingCollection",
+      "requirements": [
+        "PRS-003",
+        "ERR-005"
+      ]
+    },
+    {
+      "name": "parseProfile",
+      "requirements": [
+        "PRS-003",
+        "ERR-005"
+      ]
+    },
+    {
+      "name": "parseComponentDefinition",
+      "requirements": [
+        "PRS-003",
+        "ERR-005"
+      ]
+    },
+    {
+      "name": "parseSystemSecurityPlan",
+      "requirements": [
+        "PRS-003",
+        "ERR-005"
+      ]
+    },
+    {
+      "name": "parseAssessmentPlan",
+      "requirements": [
+        "PRS-003",
+        "ERR-005"
+      ]
+    },
+    {
+      "name": "parseAssessmentResults",
+      "requirements": [
+        "PRS-003",
+        "ERR-005"
+      ]
+    },
+    {
+      "name": "parsePlanOfActionAndMilestones",
+      "requirements": [
+        "PRS-003",
+        "ERR-005"
+      ]
+    },
+    {
+      "name": "isValid",
+      "requirements": [
+        "ERR-002"
+      ]
+    }
+  ]
 }

@@ -1,0 +1,169 @@
+/**
+ * The parse operations (design.md D1, D4 to D7). Each operation runs the stages of one internal pipeline. A stage ends
+ * the operation at its first failure, so the binding does no more work on input that is known to be invalid.
+ */
+import fs from "node:fs";
+import { DocumentTypeMismatchError, type FailureEntry, NotFoundError, ParseError } from "./errors.ts";
+import type {
+  AssessmentPlanDocument,
+  AssessmentResultsDocument,
+  CatalogDocument,
+  ComponentDefinitionDocument,
+  MappingCollectionDocument,
+  OscalDocument,
+  PlanOfActionAndMilestonesDocument,
+  ProfileDocument,
+  SystemSecurityPlanDocument,
+} from "./generated/oscal.ts";
+import { documentValidators, rootKeys } from "./validators.ts";
+
+type Input = string | Uint8Array;
+
+/** The deepest nesting that a parse accepts. An object or an array is one level. The root object is level 1. */
+const MAX_NESTING_DEPTH = 250;
+
+const utf8 = new TextDecoder("utf-8", { fatal: true });
+
+/** Stage 1 and 2: the JSON value of the input. */
+function decodeJson(input: Input): unknown {
+  let text: string;
+  if (typeof input === "string") {
+    text = input;
+  } else if (input instanceof Uint8Array) {
+    try {
+      text = utf8.decode(input);
+    } catch {
+      throw new ParseError("the input is not valid UTF-8");
+    }
+  } else {
+    throw new ParseError("the input is not text or bytes");
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new ParseError(`the input is not valid JSON: ${(error as Error).message}`);
+  }
+}
+
+/** The child values of an object or an array. */
+const childrenOf = (node: object): unknown[] => (Array.isArray(node) ? node : Object.values(node));
+
+/**
+ * Stage 3: whether the nesting depth of a JSON value is over the limit. The walk keeps one cursor for each open object
+ * or array, so it does not recurse, and its stack grows only with the depth.
+ */
+function exceedsDepthLimit(root: unknown): boolean {
+  if (root === null || typeof root !== "object") return false;
+  const stack = [{ values: childrenOf(root), next: 0 }];
+  while (stack.length > 0) {
+    const top = stack[stack.length - 1];
+    if (top.next === top.values.length) {
+      stack.pop();
+      continue;
+    }
+    const value = top.values[top.next++];
+    if (value !== null && typeof value === "object") {
+      if (stack.length >= MAX_NESTING_DEPTH) return true;
+      stack.push({ values: childrenOf(value), next: 0 });
+    }
+  }
+  return false;
+}
+
+/** Stage 4: the one root key of the input. Throws for no root key, for two or more, and for a typed mismatch. */
+function rootKeyOf(value: unknown, expected?: string): string {
+  const found =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? Object.keys(value).filter((key) => rootKeys.includes(key))
+      : [];
+  if (found.length === 0) throw new ParseError("the input names no OSCAL document type");
+  if (found.length > 1) {
+    const message = `the input names more than one document type: ${found.join(", ")}`;
+    throw new ParseError(message, [{ location: "", messages: [message] }]);
+  }
+  if (expected !== undefined && found[0] !== expected) throw new DocumentTypeMismatchError(expected, found[0]);
+  return found[0];
+}
+
+/** Stages 1 to 4. Returns the parsed value and its root key. */
+function read(input: Input, expected?: string): { value: unknown; rootKey: string } {
+  const value = decodeJson(input);
+  if (exceedsDepthLimit(value)) {
+    throw new ParseError(`the nesting depth of the input is over the limit of ${MAX_NESTING_DEPTH} levels`);
+  }
+  return { value, rootKey: rootKeyOf(value, expected) };
+}
+
+const escapeSegment = (segment: string) => segment.replaceAll("~", "~0").replaceAll("/", "~1");
+
+/** Stage 6: one entry for each failing location (design D5). */
+function collect(value: unknown, rootKey: string): FailureEntry[] {
+  const { full } = documentValidators(rootKey);
+  full(value);
+  const byLocation = new Map<string, string[]>();
+  for (const error of full.errors ?? []) {
+    let location = error.instancePath;
+    if (error.keyword === "required") location += `/${escapeSegment(error.params.missingProperty)}`;
+    if (error.keyword === "additionalProperties") location += `/${escapeSegment(error.params.additionalProperty)}`;
+    const messages = byLocation.get(location);
+    if (messages === undefined) byLocation.set(location, [error.message ?? error.keyword]);
+    else messages.push(error.message ?? error.keyword);
+  }
+  return [...byLocation].map(([location, messages]) => ({ location, messages }));
+}
+
+/** The pipeline of every parse operation. The typed parsers pass the expected root key. */
+function parseInput(input: Input, expected?: string): unknown {
+  const { value, rootKey } = read(input, expected);
+  if (documentValidators(rootKey).failFast(value)) return value;
+  const failures = collect(value, rootKey);
+  throw new ParseError(`the ${rootKey} document is not valid at ${failures.length} location(s)`, failures);
+}
+
+/** Reads an OSCAL document of any type from JSON text or UTF-8 bytes (PRS-001). Throws a `ParseError`. */
+export function parse(input: string | Uint8Array): OscalDocument {
+  return parseInput(input) as OscalDocument;
+}
+
+/**
+ * Reads an OSCAL document from a file path (PRS-002). Throws a `NotFoundError` for a path that does not exist. Any
+ * other read error passes through unchanged, because the contract defines no category for it.
+ */
+export function parseFile(path: string): OscalDocument {
+  let bytes: Uint8Array;
+  try {
+    bytes = fs.readFileSync(path);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") throw new NotFoundError(path);
+    throw error;
+  }
+  return parse(bytes);
+}
+
+/** Whether the input is a valid OSCAL document. Never throws (ERR-002). */
+export function isValid(input: string | Uint8Array): boolean {
+  try {
+    const { value, rootKey } = read(input);
+    return documentValidators(rootKey).failFast(value) === true;
+  } catch {
+    return false;
+  }
+}
+
+const typed =
+  <T extends OscalDocument>(rootKey: string) =>
+  (input: string | Uint8Array): T =>
+    parseInput(input, rootKey) as T;
+
+/** Typed parsers (PRS-003). Each throws a `DocumentTypeMismatchError` for a document of another type. */
+export const parseCatalog = typed<CatalogDocument>("catalog");
+export const parseMappingCollection = typed<MappingCollectionDocument>("mapping-collection");
+export const parseProfile = typed<ProfileDocument>("profile");
+export const parseComponentDefinition = typed<ComponentDefinitionDocument>("component-definition");
+export const parseSystemSecurityPlan = typed<SystemSecurityPlanDocument>("system-security-plan");
+export const parseAssessmentPlan = typed<AssessmentPlanDocument>("assessment-plan");
+export const parseAssessmentResults = typed<AssessmentResultsDocument>("assessment-results");
+export const parsePlanOfActionAndMilestones = typed<PlanOfActionAndMilestonesDocument>(
+  "plan-of-action-and-milestones",
+);
