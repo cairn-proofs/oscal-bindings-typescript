@@ -21,6 +21,16 @@
       ]
     },
     {
+      "name": "serialize",
+      "requirements": [
+        "SER-001",
+        "SER-002",
+        "SER-003",
+        "SER-004",
+        "SER-005"
+      ]
+    },
+    {
       "name": "parseFile",
       "requirements": [
         "PRS-002",

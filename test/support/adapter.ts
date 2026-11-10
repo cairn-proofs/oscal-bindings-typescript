@@ -5,6 +5,7 @@
  */
 
 import { OscalError, ParseError } from "../../src/errors.ts";
+import type { OscalDocument } from "../../src/generated/oscal.ts";
 import {
   isValid,
   parse,
@@ -18,6 +19,7 @@ import {
   parseProfile,
   parseSystemSecurityPlan,
 } from "../../src/parse.ts";
+import { serialize } from "../../src/serialize.ts";
 
 /** The typed parser of each root key. */
 const typedParsers: Record<string, (input: string | Uint8Array) => unknown> = {
@@ -80,7 +82,7 @@ export const adapter: Adapter = {
     return parser(input);
   },
   parseFile,
-  serialize: () => notImplemented("serialize"),
+  serialize: (document) => serialize(document as OscalDocument),
   isValid,
   validateElement: () => notImplemented("validateElement"),
   assessmentPeriod: () => notImplemented("assessmentPeriod"),
