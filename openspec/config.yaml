@@ -15,6 +15,15 @@ context: |
   If you add line breaks to Markdown, break at 120 columns, not 80.
   List style: prefer NUMBERED lists (`1.`, `2.`) over bullets for any enumerable prose so each item is referenceable.
   Proposals and designs cite GitHub issues, discussions, etc. Specs do not.
+  When exploring, proposing, or designing, NEVER extend the scope beyond what is explicitly stated in the context. 
+   If you find an edge case or ambiguity that seems to justify extending the scope, stop and seek clarification. 
+  Discussion during exploration may raise questions or considerations that are ruled out. Do not include those in
+   the artifacts. Future readers will not understand answers to questions that were never asked.
+  Always propose, spec, and design the smallest, simplest change that solves the problem at hand.
+  When it seems like a requirement or scenario needs an extension or exception, first ask if the problem is better
+   solved by eliminating the requirement or scenario.
+  User time and tokens are constrained resources. Do not waste them on trivial matters. If you're inclined to qualify
+   a matter as a nit, minor, small, or otherwise inconsenquential, then either justify raising it or drop the matter.  
 
 # Per-artifact rules (optional)
 rules:
