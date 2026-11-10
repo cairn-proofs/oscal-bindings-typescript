@@ -10,5 +10,5 @@
     "skipLibCheck": false,
     "types": []
   },
-  "include": ["src/**/*.ts", "test/types/**/*.ts"]
+  "include": ["src/generated/**/*.ts", "test/types/**/*.ts"]
 }

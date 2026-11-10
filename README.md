@@ -10,28 +10,63 @@ naming manifest published by
 
 ## Status
 
-The repository currently holds a spike. The spike tests whether the provisional naming manifest format of the spec
-store is enough for a second language to generate types. It is not a binding.
+The repository holds a spike and the first operations of a binding.
 
 What exists:
 
 - A manifest validator that a consumer runs before it generates code.
 - A generator that writes TypeScript type declarations to `src/generated/oscal.ts`.
 - Type tests: valid corpus documents compile against the generated types, and documents with an invalid shape do not.
+- Runtime validators for each type of the manifest, and the element-type registry.
+- Parsing. `parse` and `parseFile` read an OSCAL JSON document. One typed parser reads each of the eight document
+  types, for example `parseCatalog`. `isValid` checks a document and never throws.
+- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, and `NotFoundError`. A `ParseError` of a
+  schema failure carries one entry for each failing location.
 - A conformance runner. It runs each of the 58 cases of `corpus/1.2.3/cases.json` as one test, with the case id as the
-  test name. The binding has no operation yet, so `test/conformance/expected-failures.json` lists each case. A listed
-  case that passes fails the run, and so does a listed id that is not in the corpus. A change that adds an operation
-  connects it in `test/support/adapter.ts` and removes the cases that it fixes from the list.
-- A traceability record, `openspec/traceability.json`. The binding exports no operation yet, so the record has no
-  entry. `test/traceability.test.ts` checks the record against the JSON Schema and the requirement index of the pinned
-  spec artifact.
+  test name. The cases of parsing pass. `test/conformance/expected-failures.json` lists each case that needs an
+  operation that does not exist yet. A listed case that passes fails the run, and so does a listed id that is not in
+  the corpus. A change that adds an operation connects it in `test/support/adapter.ts` and removes the cases that it
+  fixes from the list.
+- A traceability record, `openspec/traceability.json`. It has one entry for each exported operation.
+  `test/traceability.test.ts` checks the record against the JSON Schema and the requirement index of the pinned spec
+  artifact.
 
 What does not exist:
 
-- Runtime parsing and validation
 - Serialization
-- Regex dialect translation and datetime handling
 - A published npm package
+
+## Limits
+
+A parse limits the nesting depth of its input to 250 levels. The limit has these properties:
+
+1. Each object and each array is one level. A scalar adds no level. The root object is level 1.
+2. The limit applies to `parse`, `parseFile`, the typed parsers, and `isValid`.
+3. A deeper input gives a `ParseError` that names the limit. `isValid` returns false for it.
+4. A caller cannot change the limit.
+
+The schema checks recurse once for each level. A deeper input can make them throw a `RangeError`, so the binding stops
+such an input first.
+
+A `ParseError` has no limit on its entries. It carries one entry for each failing location.
+
+## Regex patterns
+
+The OSCAL schema holds XSD regex patterns. Ajv compiles each pattern with the JavaScript regex engine and the `u` flag.
+The `u` flag keeps the XSD meaning of `\p{L}` and `\p{N}`.
+
+Three constructs have a different meaning in XSD and in JavaScript. The binding translates them outside a character
+class:
+
+1. `.` becomes `[^\n\r]`. XSD `.` excludes only LF and CR. JavaScript `.` also excludes U+2028 and U+2029.
+2. `\s` becomes `[\t\n\r ]`. XSD `\s` matches only space, tab, LF, and CR. JavaScript `\s` also matches other Unicode
+   white space.
+3. `\S` becomes `[^\t\n\r ]`.
+
+The binding copies each other escape and each character class unchanged. It throws when it compiles a pattern with `\s`
+or `\S` inside a character class. No pattern of the current schema has one.
+
+One deviation exists. Ajv ignores the `pattern` of `DecimalDatatype`, because the parsed value is a number and not text.
 
 ## Development
 

@@ -4,6 +4,33 @@
  * runner in runner.ts holds the rules of the corpus, so no other file changes.
  */
 
+import { OscalError, ParseError } from "../../src/errors.ts";
+import {
+  isValid,
+  parse,
+  parseAssessmentPlan,
+  parseAssessmentResults,
+  parseCatalog,
+  parseComponentDefinition,
+  parseFile,
+  parseMappingCollection,
+  parsePlanOfActionAndMilestones,
+  parseProfile,
+  parseSystemSecurityPlan,
+} from "../../src/parse.ts";
+
+/** The typed parser of each root key. */
+const typedParsers: Record<string, (input: string | Uint8Array) => unknown> = {
+  catalog: parseCatalog,
+  "mapping-collection": parseMappingCollection,
+  profile: parseProfile,
+  "component-definition": parseComponentDefinition,
+  "system-security-plan": parseSystemSecurityPlan,
+  "assessment-plan": parseAssessmentPlan,
+  "assessment-results": parseAssessmentResults,
+  "plan-of-action-and-milestones": parsePlanOfActionAndMilestones,
+};
+
 /** Thrown by each adapter function until the binding has the operation. */
 export class NotImplemented extends Error {
   constructor(operation: string) {
@@ -46,15 +73,22 @@ export interface Adapter {
 }
 
 export const adapter: Adapter = {
-  parse: () => notImplemented("parse"),
-  parseTyped: () => notImplemented("parseTyped"),
-  parseFile: () => notImplemented("parseFile"),
+  parse,
+  parseTyped: (documentType, input) => {
+    const parser = typedParsers[documentType];
+    if (parser === undefined) throw new Error(`${documentType} is not a document type`);
+    return parser(input);
+  },
+  parseFile,
   serialize: () => notImplemented("serialize"),
-  isValid: () => notImplemented("isValid"),
+  isValid,
   validateElement: () => notImplemented("validateElement"),
   assessmentPeriod: () => notImplemented("assessmentPeriod"),
   parseYaml: () => notImplemented("parseYaml"),
   serializeYaml: () => notImplemented("serializeYaml"),
-  category: () => notImplemented("category"),
-  failureCount: () => notImplemented("failureCount"),
+  category: (error) => {
+    if (error instanceof OscalError) return error.category;
+    throw error;
+  },
+  failureCount: (error) => (error instanceof ParseError ? error.failures.length : 0),
 };
