@@ -20,20 +20,21 @@ What exists:
 - Runtime validators for each type of the manifest, and the element-type registry.
 - Parsing. `parse` and `parseFile` read an OSCAL JSON document. One typed parser reads each of the eight document
   types, for example `parseCatalog`. `isValid` checks a document and never throws.
+- Serialization. `serialize` writes an OSCAL document as OSCAL JSON. The output has an indent of 2 spaces. The
+  `compact` option gives the output without whitespace.
 - The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, and `NotFoundError`. A `ParseError` of a
   schema failure carries one entry for each failing location.
 - A conformance runner. It runs each of the 58 cases of `corpus/1.2.3/cases.json` as one test, with the case id as the
-  test name. The cases of parsing pass. `test/conformance/expected-failures.json` lists each case that needs an
-  operation that does not exist yet. A listed case that passes fails the run, and so does a listed id that is not in
-  the corpus. A change that adds an operation connects it in `test/support/adapter.ts` and removes the cases that it
-  fixes from the list.
+  test name. The cases of parsing and the `round-trip` cases pass. `test/conformance/expected-failures.json` lists
+  each case that needs an operation that does not exist yet. A listed case that passes fails the run, and so does a
+  listed id that is not in the corpus. A change that adds an operation connects it in `test/support/adapter.ts` and
+  removes the cases that it fixes from the list.
 - A traceability record, `openspec/traceability.json`. It has one entry for each exported operation.
   `test/traceability.test.ts` checks the record against the JSON Schema and the requirement index of the pinned spec
   artifact.
 
 What does not exist:
 
-- Serialization
 - A published npm package
 
 ## Limits
