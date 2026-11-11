@@ -20,6 +20,7 @@ import {
   parseSystemSecurityPlan,
 } from "../../src/parse.ts";
 import { serialize } from "../../src/serialize.ts";
+import { validateElement } from "../../src/validate-element.ts";
 
 /** The typed parser of each root key. */
 const typedParsers: Record<string, (input: string | Uint8Array) => unknown> = {
@@ -84,7 +85,7 @@ export const adapter: Adapter = {
   parseFile,
   serialize: (document) => serialize(document as OscalDocument),
   isValid,
-  validateElement: () => notImplemented("validateElement"),
+  validateElement: (elementType, value) => validateElement(elementType, value).valid,
   assessmentPeriod: () => notImplemented("assessmentPeriod"),
   parseYaml: () => notImplemented("parseYaml"),
   serializeYaml: () => notImplemented("serializeYaml"),

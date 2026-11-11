@@ -98,6 +98,22 @@
       "requirements": [
         "ERR-002"
       ]
+    },
+    {
+      "name": "validateElement",
+      "requirements": [
+        "ELV-001",
+        "ELV-003",
+        "ERR-008",
+        "PRS-007",
+        "PRS-009"
+      ]
+    },
+    {
+      "name": "supportedElementTypes",
+      "requirements": [
+        "ELV-002"
+      ]
     }
   ]
 }
