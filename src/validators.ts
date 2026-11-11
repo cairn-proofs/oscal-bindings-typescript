@@ -9,6 +9,7 @@ import { Ajv, type ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 import { type ElementType, elementTypes } from "./generated/element-types.ts";
 import schema from "./generated/oscal-complete-schema.json" with { type: "json" };
+import { type FailureEntry, ParseError } from "./errors.ts";
 
 export { type ElementType, elementTypes };
 
@@ -72,6 +73,7 @@ const ajv = createAjv(true);
 const failFastAjv = createAjv(false);
 
 const pointers = new Map(elementTypes.map((row) => [row.typeName, row.pointer]));
+const elementPointers = new Map(elementTypes.map((row) => [row.elementType, row.pointer]));
 
 /**
  * The Ajv validate function of a canonical type name. The function holds the errors of its last call in its `errors`
@@ -85,12 +87,22 @@ export function validatorFor(typeName: string): ValidateFunction {
   return validate;
 }
 
-/** The two validators of one document branch of the root schema (design D3). */
-export interface DocumentValidators {
+/** The two validators of one document branch or one element type (design D3). */
+export interface Validators {
   /** Stops at the first error. Checks each input first. */
   readonly failFast: ValidateFunction;
   /** Collects each error. Runs after a failed fail-fast check. */
   readonly full: ValidateFunction;
+}
+
+/** The fail-fast and collecting validate functions of the schema node at a pointer. Throws when there is no node. */
+function validatorsAt(label: string, pointer: string): Validators {
+  const get = (instance: Ajv) => {
+    const validate = instance.getSchema(`${schema.$id}${pointer}`);
+    if (validate === undefined) throw new Error(`${label}: no schema at ${pointer}`);
+    return validate;
+  };
+  return { failFast: get(failFastAjv), full: get(ajv) };
 }
 
 /** The pointer of the root `oneOf` branch for each root key. A branch requires its root key. */
@@ -105,13 +117,72 @@ export const rootKeys: readonly string[] = [...branchPointers.keys()];
  * The validators of the document branch of a root key. Each instance compiles a branch on its first request. Throws
  * for a key that is not a root key.
  */
-export function documentValidators(rootKey: string): DocumentValidators {
+export function documentValidators(rootKey: string): Validators {
   const pointer = branchPointers.get(rootKey);
   if (pointer === undefined) throw new Error(`${rootKey} is not a root key`);
-  const get = (instance: Ajv) => {
-    const validate = instance.getSchema(`${schema.$id}${pointer}`);
-    if (validate === undefined) throw new Error(`${rootKey}: no schema at ${pointer}`);
-    return validate;
-  };
-  return { failFast: get(failFastAjv), full: get(ajv) };
+  return validatorsAt(rootKey, pointer);
+}
+
+/**
+ * The validators of an element type, by its kebab-case element-type name (design D4). Returns `undefined` for a name that
+ * is not in the registry, so the caller owns the error.
+ */
+export function elementValidators(elementType: string): Validators | undefined {
+  const pointer = elementPointers.get(elementType);
+  return pointer === undefined ? undefined : validatorsAt(elementType, pointer);
+}
+
+/** The deepest nesting that a parse or an element validation accepts. An object or an array is one level. */
+const MAX_NESTING_DEPTH = 250;
+
+/** The child values of an object or an array. */
+const childrenOf = (node: object): unknown[] => (Array.isArray(node) ? node : Object.values(node));
+
+/**
+ * Whether the nesting depth of a JSON value is over the limit. The walk keeps one cursor for each open object or array,
+ * so it does not recurse, and its stack grows only with the depth.
+ */
+function exceedsDepthLimit(root: unknown): boolean {
+  if (root === null || typeof root !== "object") return false;
+  const stack = [{ values: childrenOf(root), next: 0 }];
+  while (stack.length > 0) {
+    const top = stack[stack.length - 1];
+    if (top.next === top.values.length) {
+      stack.pop();
+      continue;
+    }
+    const value = top.values[top.next++];
+    if (value !== null && typeof value === "object") {
+      if (stack.length >= MAX_NESTING_DEPTH) return true;
+      stack.push({ values: childrenOf(value), next: 0 });
+    }
+  }
+  return false;
+}
+
+/** Throws a `ParseError` that names the limit when the nesting depth of the value is over it (design D3). */
+export function assertWithinDepthLimit(value: unknown): void {
+  if (exceedsDepthLimit(value)) {
+    throw new ParseError(`the nesting depth of the input is over the limit of ${MAX_NESTING_DEPTH} levels`);
+  }
+}
+
+const escapeSegment = (segment: string) => segment.replaceAll("~", "~0").replaceAll("/", "~1");
+
+/**
+ * One entry for each failing location (design D6). Runs the collecting validate function on the value, and reads its
+ * errors.
+ */
+export function collect(full: ValidateFunction, value: unknown): FailureEntry[] {
+  full(value);
+  const byLocation = new Map<string, string[]>();
+  for (const error of full.errors ?? []) {
+    let location = error.instancePath;
+    if (error.keyword === "required") location += `/${escapeSegment(error.params.missingProperty)}`;
+    if (error.keyword === "additionalProperties") location += `/${escapeSegment(error.params.additionalProperty)}`;
+    const messages = byLocation.get(location);
+    if (messages === undefined) byLocation.set(location, [error.message ?? error.keyword]);
+    else messages.push(error.message ?? error.keyword);
+  }
+  return [...byLocation].map(([location, messages]) => ({ location, messages }));
 }

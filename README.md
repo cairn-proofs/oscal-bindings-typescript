@@ -22,10 +22,13 @@ What exists:
   types, for example `parseCatalog`. `isValid` checks a document and never throws.
 - Serialization. `serialize` writes an OSCAL document as OSCAL JSON. The output has an indent of 2 spaces. The
   `compact` option gives the output without whitespace.
-- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, and `NotFoundError`. A `ParseError` of a
-  schema failure carries one entry for each failing location.
+- Element validation. `validateElement` checks a standalone element against a named element type, for example
+  `observation`. The result states whether the element is valid, and lists one entry for each failing location.
+  `supportedElementTypes` returns the sorted list of element-type names.
+- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `NotFoundError`, and
+  `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing location.
 - A conformance runner. It runs each of the 58 cases of `corpus/1.2.3/cases.json` as one test, with the case id as the
-  test name. The cases of parsing and the `round-trip` cases pass. `test/conformance/expected-failures.json` lists
+  test name. The cases of parsing, the `round-trip` cases, and the `element/*` cases pass. `test/conformance/expected-failures.json` lists
   each case that needs an operation that does not exist yet. A listed case that passes fails the run, and so does a
   listed id that is not in the corpus. A change that adds an operation connects it in `test/support/adapter.ts` and
   removes the cases that it fixes from the list.
@@ -39,15 +42,17 @@ What does not exist:
 
 ## Limits
 
-A parse limits the nesting depth of its input to 250 levels. The limit has these properties:
+A parse limits the nesting depth of its input to 250 levels. `validateElement` applies the same limit to its value. The
+limit has these properties:
 
-1. Each object and each array is one level. A scalar adds no level. The root object is level 1.
-2. The limit applies to `parse`, `parseFile`, the typed parsers, and `isValid`.
-3. A deeper input gives a `ParseError` that names the limit. `isValid` returns false for it.
+1. Each object and each array is one level. A scalar adds no level. The root value is level 1, whether it is an object
+   or an array.
+2. The limit applies to `parse`, `parseFile`, the typed parsers, `isValid`, and `validateElement`.
+3. A deeper input or value gives a `ParseError` that names the limit. `isValid` returns false for it.
 4. A caller cannot change the limit.
 
-The schema checks recurse once for each level. A deeper input can make them throw a `RangeError`, so the binding stops
-such an input first.
+The schema checks recurse once for each level. A deeper input or value can make them throw a `RangeError`, so the
+binding stops it first. A valid element that is deeper than 250 levels gives a `ParseError`, not a valid result.
 
 A `ParseError` has no limit on its entries. It carries one entry for each failing location.
 

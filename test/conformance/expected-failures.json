@@ -1,13 +1,5 @@
 {
   "assessment-period/catalog": "not implemented",
-  "element/observation-valid": "not implemented",
-  "element/observation-missing-collected": "not implemented",
-  "element/property-valid": "not implemented",
-  "element/property-invalid-name": "not implemented",
-  "element/back-matter-valid": "not implemented",
-  "element/back-matter-empty-resources": "not implemented",
-  "element/parameter-selection-out-of-set": "not implemented",
-  "element/unknown-element-type": "not implemented",
   "yaml-round-trip/catalog": "not implemented",
   "yaml-round-trip/profile": "not implemented",
   "yaml-round-trip/component-definition": "not implemented",

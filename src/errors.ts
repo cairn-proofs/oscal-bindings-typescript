@@ -57,3 +57,13 @@ export class NotFoundError extends OscalError {
     this.path = path;
   }
 }
+
+/** An element-validation call names an element type that the binding does not recognize (ERR-008). */
+export class UnknownElementTypeError extends OscalError {
+  readonly elementType: string;
+
+  constructor(elementType: string) {
+    super("unknown-element-type", `unknown element type: ${elementType}`);
+    this.elementType = elementType;
+  }
+}
