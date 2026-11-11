@@ -25,6 +25,10 @@ What exists:
 - Element validation. `validateElement` checks a standalone element against a named element type, for example
   `observation`. The result states whether the element is valid, and lists one entry for each failing location.
   `supportedElementTypes` returns the sorted list of element-type names.
+- The document facade. `OscalDoc` wraps a document of any of the eight types. It gives the wrapper, the body, the
+  metadata, the OSCAL version, and the body UUID through one shape. `OscalDoc.fromJson` builds it from text or bytes,
+  and `OscalDoc.fromFile` builds it from a file path. The constructor throws a `TypeError` for a value that is not a
+  document wrapper.
 - The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `NotFoundError`, and
   `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing location.
 - A conformance runner. It runs each of the 58 cases of `corpus/1.2.3/cases.json` as one test, with the case id as the
