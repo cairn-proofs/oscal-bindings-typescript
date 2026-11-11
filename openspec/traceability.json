@@ -114,6 +114,14 @@
       "requirements": [
         "ELV-002"
       ]
+    },
+    {
+      "name": "OscalDoc",
+      "requirements": [
+        "FAC-001",
+        "FAC-002",
+        "FAC-003"
+      ]
     }
   ]
 }
