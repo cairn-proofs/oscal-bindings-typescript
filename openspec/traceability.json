@@ -122,6 +122,24 @@
         "FAC-002",
         "FAC-003"
       ]
+    },
+    {
+      "name": "buildHash",
+      "requirements": [
+        "BMB-001"
+      ]
+    },
+    {
+      "name": "buildRlink",
+      "requirements": [
+        "BMB-002"
+      ]
+    },
+    {
+      "name": "buildResource",
+      "requirements": [
+        "BMB-003"
+      ]
     }
   ]
 }
