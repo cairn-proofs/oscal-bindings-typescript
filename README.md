@@ -29,6 +29,10 @@ What exists:
   metadata, the OSCAL version, and the body UUID through one shape. `OscalDoc.fromJson` builds it from text or bytes,
   and `OscalDoc.fromFile` builds it from a file path. The constructor throws a `TypeError` for a value that is not a
   document wrapper.
+- Back-matter builders. `buildHash`, `buildRlink`, and `buildResource` build a hash, an rlink, and a back-matter
+  resource. `buildHash` uses SHA-256 when the caller omits the algorithm. `buildResource` generates a UUID when the
+  caller omits `uuid`. Each builder validates its result, and an omitted optional input is absent from the result. An
+  invalid input gives a `ParseError` that carries one entry for each failing location.
 - The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `NotFoundError`, and
   `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing location.
 - A conformance runner. It runs each of the 58 cases of `corpus/1.2.3/cases.json` as one test, with the case id as the
@@ -51,7 +55,8 @@ limit has these properties:
 
 1. Each object and each array is one level. A scalar adds no level. The root value is level 1, whether it is an object
    or an array.
-2. The limit applies to `parse`, `parseFile`, the typed parsers, `isValid`, and `validateElement`.
+2. The limit applies to `parse`, `parseFile`, the typed parsers, `isValid`, `validateElement`, `buildHash`,
+   `buildRlink`, and `buildResource`.
 3. A deeper input or value gives a `ParseError` that names the limit. `isValid` returns false for it.
 4. A caller cannot change the limit.
 

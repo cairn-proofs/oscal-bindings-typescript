@@ -30,7 +30,10 @@ export class OscalError extends Error {
   }
 }
 
-/** The input is not an OSCAL document: it is not text, not JSON, too deep, or not valid against the schema. */
+/**
+ * The input is not an OSCAL document or an OSCAL element: it is not text, not JSON, too deep, or not valid against the
+ * schema. A back-matter builder throws it for an invalid element value.
+ */
 export class ParseError extends OscalError {
   /** One entry for each failing location. The array is empty when the failure has no schema location. */
   readonly failures: readonly FailureEntry[];
