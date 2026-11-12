@@ -1,0 +1,11 @@
+# Changes to these paths can weaken the CI gate, the spec-artifact pin or the
+# generated files that consumers load. They need review by a code owner when
+# the main ruleset requires it.
+/.github/          @dfkunstler
+/scripts/          @dfkunstler
+/src/generated/    @dfkunstler
+/package.json      @dfkunstler
+/package-lock.json @dfkunstler
+/.npmrc            @dfkunstler
+/mise.lock         @dfkunstler
+/mise.toml         @dfkunstler
