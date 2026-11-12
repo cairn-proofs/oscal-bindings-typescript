@@ -1,8 +1,8 @@
 # oscal-bindings-typescript
 
 > [!WARNING]
-> **Pre-alpha.** This repository is an experiment. The binding reads, checks, and writes OSCAL JSON. It has no npm
-> package and no stability guarantees, and its API can change without notice.
+> **Alpha.** The binding reads, checks, and writes OSCAL JSON. It has no npm package and no stability guarantees, and
+> its API can change without notice.
 
 Typed TypeScript data bindings for [OSCAL](https://pages.nist.gov/OSCAL/), generated from the NIST JSON Schema and the
 naming manifest published by
