@@ -9,3 +9,10 @@
 /.npmrc            @dfkunstler
 /mise.lock         @dfkunstler
 /mise.toml         @dfkunstler
+
+# These files hold the behavior that the "Security notes for consumers" section of the README describes, and the tests
+# that pin it. A change here can make a note false. The reviewer checks that the README and test/security-notes.test.ts
+# still match the code.
+/README.md                       @dfkunstler
+/src/*.ts                        @dfkunstler
+/test/security-notes.test.ts     @dfkunstler
