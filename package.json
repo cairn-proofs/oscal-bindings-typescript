@@ -16,6 +16,7 @@
     "types:check": "tsc -p tsconfig.types.json",
     "fixtures": "tsx scripts/type-fixtures.ts",
     "global-names": "tsx scripts/global-names.ts",
+    "bench": "tsx scripts/benchmark.ts",
     "validate": "openspec validate --all --strict",
     "check": "npm run typecheck && npm run test && npm run generate:check && npm run fixtures && npm run types:check && npm run global-names && npm run validate"
   },
