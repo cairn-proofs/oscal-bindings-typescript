@@ -37,20 +37,24 @@ What exists:
   document wrapper.
 - Back-matter builders. `buildHash`, `buildRlink`, and `buildResource` build a hash, an rlink, and a back-matter
   resource. `buildHash` uses SHA-256 when the caller omits the algorithm. `buildResource` generates a UUID when the
-  caller omits `uuid`. Each builder validates its result, and an omitted optional input is absent from the result. An
-  invalid input gives a `ParseError` that carries one entry for each failing location.
-- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `LimitExceededError`, `NotFoundError`,
-  `ReadError`, and `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing
-  location. Use `instanceof` to test the category of an error. A `DocumentTypeMismatchError` is also a `ParseError`, but
-  a `ParseError` is not a `DocumentTypeMismatchError`. The `category` property holds the most specific category. The
-  `limit` property identifies the limit that stopped an operation, for example `nesting-depth` or `alias-expansion`.
-  Test it with `error.limit !== undefined`, because each error has the `limit` key.
+  caller gives no `uuid` and no `key`. With a `key` and no `uuid`, the `uuid` is the UUID version 5 of the key, so the
+  same key gives the same `uuid`. A `key` with a `uuid`, and an empty `key`, give a `BuilderError`. Each builder
+  validates its result, and an omitted optional input is absent from the result. An invalid input gives a `BuilderError`
+  that carries one entry for each failing location. A `BuilderError` is not a `ParseError`.
+- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `LimitExceededError`, `BuilderError`,
+  `NotFoundError`, `ReadError`, and `UnknownElementTypeError`. A `BuilderError` is not a `ParseError`. A `ParseError` of
+  a schema failure carries one entry for each failing location. Use `instanceof` to test the category of an error. A
+  `DocumentTypeMismatchError` is also a `ParseError`, but a `ParseError` is not a `DocumentTypeMismatchError`. The
+  `category` property holds the most specific category. The `limit` property identifies the limit that stopped an
+  operation, for example `nesting-depth` or `alias-expansion`. Test it with `error.limit !== undefined`, because each
+  error has the `limit` key.
 - A conformance runner. It runs each case of `corpus/1.2.3/cases.json` as one test, with the case id as the test name.
-  The cases of parsing, the `round-trip` cases, the `yaml-parse` and `yaml-round-trip` cases, the `element/*` cases, and
-  the `element-types` case pass. `test/conformance/expected-failures.json` lists each case that needs an operation that
-  does not exist yet. A listed case that passes fails the run, and so does a listed id that is not in the corpus. A
-  change that adds an operation connects it in `test/support/adapter.ts` and removes the cases that it fixes from the
-  list.
+  The cases of parsing, the `round-trip` cases, the `yaml-parse` and `yaml-round-trip` cases, the `element/*` cases, the
+  `element-types` case, and the `build-resource` cases of a key pass. The other `build-resource` cases need the fields
+  `expected-element` or `document-ids`. `test/conformance/expected-failures.json` lists each case that needs an
+  operation or a field that does not exist yet. A listed case that passes fails the run, and so does a listed id that is
+  not in the corpus. A change that adds an operation connects it in `test/support/adapter.ts` and removes the cases that
+  it fixes from the list.
 - A traceability record, `openspec/traceability.json`. It has one entry for each exported operation.
   `test/traceability.test.ts` checks the record against the JSON Schema and the requirement index of the pinned spec
   artifact.
@@ -136,12 +140,14 @@ conversion pass.
 
 1. Cap the size of each request body before you call `parse`, `parseYaml`, `isValid`, or `OscalDoc.fromJson`.
 2. Run the call in a worker thread, or in a bounded queue, with a timeout.
-3. A `ParseError` has no limit on its entries. Return only a set number of failure entries to a caller.
+3. A `ParseError` and a `BuilderError` have no limit on their entries. Return only a set number of failure entries to a
+   caller.
 
 #### Error text
 
 **Risk.** An error can contain text that an attacker chose. A `ParseError` carries keys and values of the input document
-in `failures[].location` and `failures[].messages`. The `message` of a `ParseError` for a YAML syntax error holds lines
+in `failures[].location` and `failures[].messages`. A `BuilderError` carries the same text of the input of a builder in
+`failures[].location` and `failures[].messages`. The `message` of a `ParseError` for a YAML syntax error holds lines
 of the input. An attacker can put long strings, control characters, or markup there. These can fill your logs or add
 fake log lines. If you show `NotFoundError.path`, `ReadError.path`, or the Node file system error in `ReadError.cause`
 (for example `EACCES` and `EISDIR`) to an attacker, it tells them which files exist, their permissions, and their

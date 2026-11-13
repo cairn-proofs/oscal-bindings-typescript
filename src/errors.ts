@@ -11,7 +11,8 @@ export type ErrorCategory =
   | "read-error"
   | "access-error"
   | "unknown-element-type"
-  | "limit-exceeded";
+  | "limit-exceeded"
+  | "builder-error";
 
 /** The documented limits of the binding (ERR-010). */
 export type Limit = "nesting-depth" | "alias-expansion";
@@ -40,7 +41,7 @@ export class OscalError extends Error {
 
 /**
  * The input is not an OSCAL document or an OSCAL element: it is not text, not JSON, too deep, or not valid against the
- * schema. A back-matter builder throws it for an invalid element value.
+ * schema.
  */
 export class ParseError extends OscalError {
   /** One entry for each failing location. The array is empty when the failure has no schema location. */
@@ -71,6 +72,17 @@ export class LimitExceededError extends OscalError {
 
   constructor(limit: Limit, message: string) {
     super("limit-exceeded", message, limit);
+  }
+}
+
+/** A back-matter builder received invalid input (ERR-013). It is not a parse error. */
+export class BuilderError extends OscalError {
+  /** One entry for each failing location. The array is empty when the failure has no schema location. */
+  readonly failures: readonly FailureEntry[];
+
+  constructor(message: string, failures: readonly FailureEntry[] = []) {
+    super("builder-error", message);
+    this.failures = failures;
   }
 }
 

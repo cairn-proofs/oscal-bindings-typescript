@@ -18,11 +18,6 @@
   "build-hash/invalid-algorithm": "not implemented (#31)",
   "build-rlink/reference-only": "not implemented (#31)",
   "build-rlink/media-type-and-hashes": "not implemented (#31)",
-  "build-resource/key": "not implemented (#30)",
-  "build-resource/key-with-title": "not implemented (#30)",
-  "build-resource/non-ascii-key": "not implemented (#30)",
-  "build-resource/key-and-identifier": "not implemented (#30)",
-  "build-resource/empty-key": "not implemented (#30)",
   "build-resource/generated-identifier": "not implemented (#31)",
   "build-resource/omitted-inputs": "not implemented (#31)",
   "build-resource/invalid-document-id": "not implemented (#31)"

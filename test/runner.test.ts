@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
 import type { Adapter } from "./support/adapter.ts";
-import { checkListedIds, loadCorpus, PENDING_OPERATIONS, runCase, runWithExpectation, type Case } from "./support/runner.ts";
+import { checkListedIds, isPendingCase, loadCorpus, runCase, runWithExpectation, type Case } from "./support/runner.ts";
 
 const corpus = loadCorpus(artifactPaths(await ensureSpecArtifact()).corpus);
 
@@ -36,6 +36,10 @@ function conforming(c: Case): Adapter {
     assessmentPeriod: fail,
     parseYaml: () => (c.operation === "yaml-parse" ? fail() : {}),
     serializeYaml: () => "",
+    buildResource: () => {
+      if (throwing) throw new FakeError(c["expected-category"] as string, 1, "the builder fails");
+      return { uuid: c["expected-uuid"] };
+    },
     category: (error) => (error as FakeError).category,
     failureCount: (error) => (error as FakeError).count,
   };
@@ -45,13 +49,12 @@ const firstOf = (operation: string, where: (c: Case) => boolean = () => true) =>
   corpus.cases.find((c) => c.operation === operation && where(c)) as Case;
 
 test("each case passes with the conforming fake adapter", () => {
-  for (const c of corpus.cases) if (!PENDING_OPERATIONS.has(c.operation)) runCase(conforming(c), corpus.dir, c);
+  for (const c of corpus.cases) if (!isPendingCase(c)) runCase(conforming(c), corpus.dir, c);
 });
 
-test("a pending operation is one that runCase does not know yet", () => {
-  for (const operation of PENDING_OPERATIONS) {
-    const c = firstOf(operation);
-    assert.throws(() => runCase(conforming(c), corpus.dir, c), /unknown operation/, operation);
+test("a pending case is one that runCase does not know yet", () => {
+  for (const c of corpus.cases.filter(isPendingCase)) {
+    assert.throws(() => runCase(conforming(c), corpus.dir, c), /unknown operation|pending: /, c.id);
   }
 });
 
@@ -146,6 +149,21 @@ const changes: Array<[string, Case, (a: Adapter, c: Case) => Partial<Adapter>]> 
       let calls = 0;
       return { serialize: (d) => (++calls === 1 ? a.serialize(d) : "{}") };
     },
+  ],
+  [
+    "build-resource: another uuid",
+    firstOf("build-resource", (c) => c["expected-uuid"] !== undefined),
+    () => ({ buildResource: () => ({ uuid: "00000000-0000-5000-8000-000000000000" }) }),
+  ],
+  [
+    "build-resource: no error",
+    firstOf("build-resource", (c) => c["expected-category"] !== undefined),
+    () => ({ buildResource: () => ({}) }),
+  ],
+  [
+    "build-resource: wrong category",
+    firstOf("build-resource", (c) => c["expected-category"] !== undefined && !isPendingCase(c)),
+    () => ({ category: () => "other" }),
   ],
   ["yaml-parse: no error", firstOf("yaml-parse"), () => ({ parseYaml: () => ({}) })],
   ["yaml-parse: wrong category", firstOf("yaml-parse"), () => ({ category: () => "other" })],

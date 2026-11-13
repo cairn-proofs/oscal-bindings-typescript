@@ -4,6 +4,7 @@
  * runner in runner.ts holds the rules of the corpus, so no other file changes.
  */
 
+import { buildResource } from "../../src/backmatter.ts";
 import { OscalError, ParseError } from "../../src/errors.ts";
 import type { OscalDocument } from "../../src/generated/oscal.ts";
 import {
@@ -72,6 +73,8 @@ export interface Adapter {
   parseYaml(input: string | Uint8Array): unknown;
   /** YML-008: the serialization to YAML. */
   serializeYaml(document: unknown): string;
+  /** BMB-004: the resource builder. The `identifier` argument is the `uuid` option. Returns the resource. */
+  buildResource(args: { key?: string; title?: string; identifier?: string }): unknown;
   /** The corpus category of an error that an operation threw. */
   category(error: unknown): Category;
   /** The count of structured failure entries of a parse error. */
@@ -93,6 +96,7 @@ export const adapter: Adapter = {
   assessmentPeriod: () => notImplemented("assessmentPeriod"),
   parseYaml,
   serializeYaml: (document) => serializeYaml(document as OscalDocument),
+  buildResource: ({ identifier, ...rest }) => buildResource({ ...rest, uuid: identifier }),
   category: (error) => {
     if (error instanceof OscalError) return error.category;
     throw error;
