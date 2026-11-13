@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildHash, buildResource, buildRlink } from "../src/backmatter.ts";
-import { ParseError } from "../src/errors.ts";
+import { LimitExceededError, ParseError } from "../src/errors.ts";
 
 const uuidPattern = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[45][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$/;
 
@@ -65,5 +65,14 @@ test("BMB-003.03 buildResource rejects an invalid or empty document-ids list", (
   assert.throws(
     () => buildResource({ "document-ids": [] }),
     (error: unknown) => error instanceof ParseError && error.failures.length > 0,
+  );
+});
+
+test("a builder value deeper than 250 levels is a limit-exceeded error", () => {
+  let deep: unknown = {};
+  for (let i = 0; i < 300; i++) deep = [deep];
+  assert.throws(
+    () => buildResource({ "document-ids": deep as { identifier: string }[] }),
+    (error: unknown) => error instanceof LimitExceededError && error.limit === "nesting-depth",
   );
 });
