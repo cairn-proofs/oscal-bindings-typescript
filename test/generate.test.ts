@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { before, test } from "node:test";
-import { elementTypeName, generate, validationPointer } from "../scripts/generate.ts";
+import { elementTypeName, generate, validationPointer, yamlTypingProblems } from "../scripts/generate.ts";
 import type { Json, Manifest } from "../scripts/manifest.ts";
 import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
 
@@ -85,6 +85,56 @@ test("two types with the same element-type name fail the run and name both types
     result.problems.some((p) => p.includes("Property and property") && p.includes("property")),
     `problems: ${result.problems.join("; ")}`,
   );
+});
+
+/** A copy of the schema with one more definition. */
+function withDefinition(name: string, definition: Json): Json {
+  const copy = structuredClone(schema) as { definitions: Record<string, Json> };
+  copy.definitions[name] = definition;
+  return copy as Json;
+}
+
+test("the YAML scalar typing check passes on the released schema", () => {
+  assert.deepEqual(yamlTypingProblems(schema), []);
+});
+
+test("a type keyword with two types fails the run and names the keyword", () => {
+  const result = generate(withDefinition("two-types", { type: ["string", "number"] }), manifest);
+  assert.equal(result.output, "");
+  assert.equal(result.elementTypes, "");
+  assert.ok(
+    result.problems.some((p) => p.startsWith("#/definitions/two-types:") && p.includes("more than one type")),
+    `problems: ${result.problems.join("; ")}`,
+  );
+});
+
+test("a union that permits a string and another scalar type fails the run and names the union", () => {
+  const union: Json = { anyOf: [{ type: "string" }, { $ref: "#/definitions/number-branch" }] };
+  const copy = withDefinition("string-or-number", union) as { definitions: Record<string, Json> };
+  copy.definitions["number-branch"] = { type: "number" };
+  const result = generate(copy, manifest);
+  assert.equal(result.output, "");
+  assert.equal(result.elementTypes, "");
+  assert.ok(
+    result.problems.some((p) => p === "#/definitions/string-or-number/anyOf: the union permits a string and another scalar type: string, number"),
+    `problems: ${result.problems.join("; ")}`,
+  );
+});
+
+test("a property that two branches of a union define with different schemas fails the run and names the property", () => {
+  const branch = (type: string) => ({ type: "object", properties: { value: { type } } });
+  const result = generate(withDefinition("two-values", { oneOf: [branch("string"), branch("number")] }), manifest);
+  assert.equal(result.output, "");
+  assert.equal(result.elementTypes, "");
+  assert.ok(
+    result.problems.some((p) => p.startsWith("#/definitions/two-values/oneOf:") && p.includes("the property value")),
+    `problems: ${result.problems.join("; ")}`,
+  );
+});
+
+test("a property that two branches of a union define with the same schema passes the check", () => {
+  const branch = (extra: string) => ({ type: "object", properties: { value: { type: "string" }, [extra]: { type: "string" } } });
+  assert.deepEqual(yamlTypingProblems(withDefinition("same-values", { oneOf: [branch("a"), branch("b")] })), []);
 });
 
 test("the committed element-type table is the generator output", () => {

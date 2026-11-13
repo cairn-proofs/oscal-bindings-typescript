@@ -34,9 +34,76 @@
       ]
     },
     {
+      "name": "serializeYaml",
+      "requirements": [
+        "YML-008",
+        "SER-001",
+        "SER-002",
+        "SER-004",
+        "SER-005"
+      ]
+    },
+    {
       "name": "parseFile",
       "requirements": [
         "PRS-002",
+        "ERR-006",
+        "ERR-012"
+      ]
+    },
+    {
+      "name": "parseYaml",
+      "requirements": [
+        "YML-002",
+        "YML-003",
+        "YML-004",
+        "YML-005",
+        "YML-009",
+        "YML-010",
+        "PRS-004",
+        "PRS-005",
+        "PRS-006",
+        "PRS-007",
+        "PRS-008",
+        "PRS-009",
+        "PRS-010",
+        "PRS-011",
+        "PRS-012",
+        "PRS-013",
+        "PRS-014",
+        "ERR-001",
+        "ERR-003",
+        "ERR-004",
+        "ERR-009",
+        "ERR-010"
+      ]
+    },
+    {
+      "name": "parseYamlFile",
+      "requirements": [
+        "YML-006",
+        "YML-002",
+        "YML-003",
+        "YML-004",
+        "YML-005",
+        "YML-009",
+        "YML-010",
+        "PRS-004",
+        "PRS-005",
+        "PRS-006",
+        "PRS-007",
+        "PRS-008",
+        "PRS-009",
+        "PRS-010",
+        "PRS-011",
+        "PRS-012",
+        "PRS-013",
+        "PRS-014",
+        "ERR-001",
+        "ERR-003",
+        "ERR-004",
+        "ERR-009",
+        "ERR-010",
         "ERR-006",
         "ERR-012"
       ]

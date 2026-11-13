@@ -9,7 +9,7 @@ import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 import { type ElementType, elementTypes, type UnionSite, unionSites } from "./generated/element-types.ts";
 import schema from "./generated/oscal-complete-schema.json" with { type: "json" };
-import type { FailureEntry } from "./errors.ts";
+import { DocumentTypeMismatchError, type FailureEntry, ParseError } from "./errors.ts";
 
 export { type ElementType, elementTypes };
 
@@ -146,6 +146,24 @@ export function documentValidators(rootKey: string): Validators {
 }
 
 /**
+ * The one root key of the input (stage 4 of a parse). Throws for no root key, for two or more, and for a typed
+ * mismatch.
+ */
+export function rootKeyOf(value: unknown, expected?: string): string {
+  const found =
+    value !== null && typeof value === "object" && !Array.isArray(value)
+      ? Object.keys(value).filter((key) => rootKeys.includes(key))
+      : [];
+  if (found.length === 0) throw new ParseError("the input names no OSCAL document type");
+  if (found.length > 1) {
+    const message = `the input names more than one document type: ${found.join(", ")}`;
+    throw new ParseError(message, [{ location: "", messages: [message] }]);
+  }
+  if (expected !== undefined && found[0] !== expected) throw new DocumentTypeMismatchError(expected, found[0]);
+  return found[0];
+}
+
+/**
  * The validators of an element type, by its kebab-case element-type name (design D4). Returns `undefined` for a name that
  * is not in the registry, so the caller owns the error.
  */
@@ -155,7 +173,7 @@ export function elementValidators(elementType: string): Validators | undefined {
 }
 
 /** The deepest nesting that a parse or an element validation accepts. An object or an array is one level. */
-const MAX_NESTING_DEPTH = 250;
+export const MAX_NESTING_DEPTH = 250;
 
 /** The child values of an object or an array. */
 const childrenOf = (node: object): unknown[] => (Array.isArray(node) ? node : Object.values(node));
@@ -222,6 +240,30 @@ function toEntries(errors: readonly ErrorObject[]): FailureEntry[] {
 /** One entry for each failing location of each error of the collecting validate function. */
 export function collect(full: ValidateFunction, value: unknown): FailureEntry[] {
   return toEntries(errorsOf(full, value));
+}
+
+/** A location of a value, and the types that the `type` errors of the location name (design D4 of the YAML change). */
+export interface TypeLocation {
+  /** A JSON Pointer from the root of the value. */
+  readonly location: string;
+  /** The types of the `type` errors at the location, in the order of the errors. */
+  readonly types: readonly string[];
+}
+
+/**
+ * The locations of a value at which the collecting validator of the document branch of a root key reports a `type`
+ * error, each with the types that the errors name. The YAML reader converts the text at each location by the grammar of
+ * these types (YML-004).
+ */
+export function typeErrors(rootKey: string, value: unknown): TypeLocation[] {
+  const byLocation = new Map<string, string[]>();
+  for (const error of errorsOf(documentValidators(rootKey).full, value)) {
+    if (error.keyword !== "type") continue;
+    const types = byLocation.get(error.instancePath) ?? [];
+    for (const type of String(error.params.type).split(",")) if (!types.includes(type)) types.push(type);
+    byLocation.set(error.instancePath, types);
+  }
+  return [...byLocation].map(([location, types]) => ({ location, types }));
 }
 
 /** The selection that owns a location: the shortest prefix of the location that the map holds, at a segment boundary. */
