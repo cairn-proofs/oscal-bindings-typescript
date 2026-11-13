@@ -16,7 +16,7 @@ checksum = "sha256:d38bd5e5a2ddce6bbb5ce45e46e208337da4d51fffe611e567fd32073d643
 url = "https://nodejs.org/dist/v26.13.0/node-v26.13.0-darwin-arm64.tar.gz"
 
 [[tools."npm:@fission-ai/openspec"]]
-version = "1.17.0"
-aube = { path = ".mise/locks/npm-fission-ai-openspec/1.17.0", digest = "sha256:c5b84b67d7a765da6091637e1c936a9bc30ea9f5493cb8e0c13af7781abcd346" }
+version = "2.0.0"
+aube = { path = ".mise/locks/npm-fission-ai-openspec/2.0.0", digest = "sha256:85843af60902f2ec4c182aa9bd7d7df3503ec67d37ebf518df192ece21669cb0" }
 backend = "npm:@fission-ai/openspec"
-specifiers = ["1.17.0"]
+specifiers = ["2.0"]

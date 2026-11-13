@@ -2,4 +2,4 @@
 # The same runtime as the oscal-bindings-specs store: the OpenSpec CLI needs Node, and the spike is TypeScript on Node.
 # mise.lock records the checksum of each tool. CI installs from the lockfile (mise-action adds --locked).
 node = "26.13.0"
-"npm:@fission-ai/openspec" = "1.17.0"
+"npm:@fission-ai/openspec" = "2.0"
