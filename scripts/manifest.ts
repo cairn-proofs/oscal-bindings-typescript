@@ -1,6 +1,7 @@
 /**
- * The consumer-side validator of the naming manifest. It applies NAM-001 to NAM-004 of the oscal-bindings-specs store
- * from the spec text, with no code from the store (design.md D2). A consumer runs it before it generates code, and it
+ * The consumer-side validator of the naming manifest. It applies NAM-001 to NAM-004, NAM-009, NAM-012, NAM-013,
+ * NAM-021, and NAM-022 of the oscal-bindings-specs store from the spec text, with no code from the store
+ * (design.md D2). A consumer runs it before it generates code, and it
  * generates nothing when the validator reports a failure.
  *
  * Pointers resolve through own properties and array indexes only, so a key such as `__proto__` never resolves to an
@@ -101,24 +102,30 @@ export function validateManifest({ manifest, namesSchema, schemaBytes, release }
   const failures: string[] = [];
   const fail = (message: string) => failures.push(message);
 
-  // 1. The JSON Schema of the format (NAM-004). The structural checks below assume a conforming file.
+  // 1. The format check (NAM-021, NAM-022). It runs before all other checks, and each failure ends validation.
+  if (!isObject(manifest)) return ["names.json is not a JSON object"];
+  if (!Object.hasOwn(manifest, "format")) return ["names.json has no format member"];
+  if (!(SUPPORTED_FORMATS as readonly Json[]).includes(manifest.format)) {
+    return [`format ${JSON.stringify(manifest.format)} is not supported`];
+  }
+
+  // 2. The JSON Schema of the format (NAM-004). The structural checks below assume a conforming file.
   const ajv = new Ajv({ allErrors: true, strict: false });
   const conforms = ajv.validate(namesSchema, manifest);
   if (!conforms) {
     for (const e of ajv.errors ?? []) fail(`[json-schema] names.json${e.instancePath} ${e.message ?? ""}`.trim());
     return failures;
   }
-  const m = manifest as Manifest;
+  const m = manifest as unknown as Manifest;
 
-  // 2. Format version and OSCAL release (NAM-003, rules 4 and 5).
-  if (!SUPPORTED_FORMATS.includes(m.format)) fail(`format ${m.format} is not supported`);
+  // 3. The OSCAL release (NAM-012, rule 2).
   if (m["oscal-release"] !== release) fail(`oscal-release ${m["oscal-release"]} is not ${release}`);
 
-  // 3. The schema hash (NAM-002.03). It is the hash of the bytes that the consumer parses.
+  // 4. The schema hash (NAM-002.03). It is the hash of the bytes that the consumer parses.
   const actual = createHash("sha256").update(schemaBytes).digest("hex");
   if (m.schema.sha256 !== actual) fail(`schema.sha256 ${m.schema.sha256} is not the sha256 ${actual} of the schema`);
 
-  // 4. Unique names, unique and resolvable pointers, references to entries (NAM-001, NAM-003).
+  // 5. Unique names, unique and resolvable pointers, references to entries (NAM-001, NAM-003, NAM-009).
   const schema = JSON.parse(schemaBytes.toString("utf8")) as Json;
   const byName = new Map<string, Entry>();
   const siteOwner = new Map<string, string>();
@@ -136,7 +143,7 @@ export function validateManifest({ manifest, namesSchema, schemaBytes, release }
     const refs = [...(entry.members ?? []), ...(entry.item ? [entry.item] : []), ...(entry.variants ?? []).map((v) => v.type)];
     for (const ref of refs) if (!byName.has(ref)) fail(`${entry.name}: the reference ${ref} names no entry`);
 
-    // 5. Variant properties and body fields are keys at their pointers (NAM-004).
+    // 6. Variant properties and body fields are keys at their pointers (NAM-004).
     for (const variant of entry.variants ?? []) {
       const branch = byName.get(variant.type);
       if (branch && !branch.sites.every((site) => hasProperty(schema, site, variant.property))) {
