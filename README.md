@@ -267,7 +267,7 @@ npm run check
 ```
 
 The check gate downloads a pinned spec artifact release from cairn-proofs/oscal-bindings-specs over HTTPS. The pin is
-release `v0.7.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256.
+release `v0.8.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256.
 
 ### Benchmarks
 

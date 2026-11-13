@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
 import type { Adapter } from "./support/adapter.ts";
-import { checkListedIds, loadCorpus, runCase, runWithExpectation, type Case } from "./support/runner.ts";
+import { checkListedIds, loadCorpus, PENDING_OPERATIONS, runCase, runWithExpectation, type Case } from "./support/runner.ts";
 
 const corpus = loadCorpus(artifactPaths(await ensureSpecArtifact()).corpus);
 
@@ -44,7 +44,14 @@ const firstOf = (operation: string, where: (c: Case) => boolean = () => true) =>
   corpus.cases.find((c) => c.operation === operation && where(c)) as Case;
 
 test("each case passes with the conforming fake adapter", () => {
-  for (const c of corpus.cases) runCase(conforming(c), corpus.dir, c);
+  for (const c of corpus.cases) if (!PENDING_OPERATIONS.has(c.operation)) runCase(conforming(c), corpus.dir, c);
+});
+
+test("a pending operation is one that runCase does not know yet", () => {
+  for (const operation of PENDING_OPERATIONS) {
+    const c = firstOf(operation);
+    assert.throws(() => runCase(conforming(c), corpus.dir, c), /unknown operation/, operation);
+  }
 });
 
 /** Each entry changes one answer of the conforming adapter. The case must then fail. */

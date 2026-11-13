@@ -1,4 +1,4 @@
-// Copy of scripts/canonical-json.ts of cairn-proofs/oscal-bindings-specs at the tag v0.7.0+oscal.1.2.3.
+// Copy of scripts/canonical-json.ts of cairn-proofs/oscal-bindings-specs at the tag v0.8.0+oscal.1.2.3.
 /**
  * The canonical form of docs/canonical-json.md: JSON with no duplicate keys, datetimes normalized, then RFC 8785
  * (JCS) serialization. Used to generate and check the expected outputs of the conformance corpus.
