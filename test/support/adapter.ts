@@ -20,7 +20,7 @@ import {
   parseSystemSecurityPlan,
 } from "../../src/parse.ts";
 import { serialize } from "../../src/serialize.ts";
-import { validateElement } from "../../src/validate-element.ts";
+import { supportedElementTypes, validateElement } from "../../src/validate-element.ts";
 
 /** The typed parser of each root key. */
 const typedParsers: Record<string, (input: string | Uint8Array) => unknown> = {
@@ -63,6 +63,8 @@ export interface Adapter {
   isValid(input: string | Uint8Array): boolean;
   /** ELV-001: the validation of a standalone element. Returns the validity result. */
   validateElement(elementType: string, value: unknown): boolean;
+  /** ELV-002: the list of supported element-type names. */
+  elementTypes(): readonly string[];
   /** FAC-004: the assessment period accessor on the facade of a parsed document. */
   assessmentPeriod(document: unknown): unknown;
   /** YML-005: the parse of YAML text or bytes. */
@@ -86,6 +88,7 @@ export const adapter: Adapter = {
   serialize: (document) => serialize(document as OscalDocument),
   isValid,
   validateElement: (elementType, value) => validateElement(elementType, value).valid,
+  elementTypes: supportedElementTypes,
   assessmentPeriod: () => notImplemented("assessmentPeriod"),
   parseYaml: () => notImplemented("parseYaml"),
   serializeYaml: () => notImplemented("serializeYaml"),

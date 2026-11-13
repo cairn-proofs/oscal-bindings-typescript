@@ -72,14 +72,13 @@ function checkFailureCount(adapter: Adapter, c: Case, error: unknown): void {
  * The operations of the corpus that runCase has no rules for yet. The change that adds the rules of an operation
  * removes it from this list. Until then, each case of the operation is in expected-failures.json, because runCase
  * rejects an operation that it does not know. Operations: facade (#31), build-hash (#31), build-rlink (#31),
- * build-resource (#30, #31), element-types (#27).
+ * build-resource (#30, #31).
  */
 export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([
   "facade",
   "build-hash",
   "build-rlink",
   "build-resource",
-  "element-types",
 ]);
 
 /** Runs one corpus case through the adapter. Throws when the binding does not give the expected result. */
@@ -126,6 +125,11 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
       } else {
         reports(adapter, c, category, () => adapter.validateElement(elementType, value));
       }
+      return;
+    }
+    case "element-types": {
+      const names: unknown = JSON.parse(fs.readFileSync(path.join(corpusDir, c.expected as string), "utf8"));
+      assert.deepEqual(adapter.elementTypes(), names, `${c.id}: the element types differ from ${c.expected}`);
       return;
     }
     case "yaml-round-trip": {
