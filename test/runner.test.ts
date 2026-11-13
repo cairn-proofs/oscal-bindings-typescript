@@ -32,6 +32,7 @@ function conforming(c: Case): Adapter {
     serialize: () => expectedJson(),
     isValid: () => c.operation !== "parse",
     validateElement: () => (throwing ? fail() : (c["expected-valid"] as boolean)),
+    elementTypes: () => JSON.parse(expectedJson()) as string[],
     assessmentPeriod: fail,
     parseYaml: () => (c.operation === "yaml-parse" ? fail() : {}),
     serializeYaml: () => "",
@@ -117,6 +118,25 @@ const changes: Array<[string, Case, (a: Adapter, c: Case) => Partial<Adapter>]> 
     "validate-element: wrong category",
     firstOf("validate-element", (c) => c["expected-category"] !== undefined),
     () => ({ category: () => "other" }),
+  ],
+  [
+    "element-types: one name less",
+    firstOf("element-types"),
+    (a) => ({ elementTypes: () => a.elementTypes().slice(1) }),
+  ],
+  [
+    "element-types: one name more",
+    firstOf("element-types"),
+    (a) => ({ elementTypes: () => [...a.elementTypes(), "extra-name"] }),
+  ],
+  [
+    "element-types: two names change position",
+    firstOf("element-types"),
+    (a) => {
+      const names = [...a.elementTypes()];
+      [names[0], names[1]] = [names[1], names[0]];
+      return { elementTypes: () => names };
+    },
   ],
   ["yaml-round-trip: first output differs", firstOf("yaml-round-trip"), () => ({ serialize: () => "{}" })],
   [
