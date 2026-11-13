@@ -14,7 +14,7 @@ export interface Case {
   input: string;
   "document-type"?: string;
   "element-type"?: string;
-  "input-form"?: "bytes";
+  "input-form"?: "bytes" | "path";
   expected?: string;
   "expected-category"?: string;
   "expected-valid"?: boolean;
@@ -50,6 +50,27 @@ function assertCanonicalEqual(corpusDir: string, c: Case, json: string, what: st
   assert.ok(canonicalBytes(json).equals(expected), `${c.id}: the canonical form of ${what} differs from ${c.expected}`);
 }
 
+/** The canonical form of the JSON of a value. */
+const canonicalOf = (value: unknown) => canonicalize(JSON.stringify(value));
+
+function assertElementEqual(c: Case, actual: unknown, expected: unknown, what: string): void {
+  assert.equal(canonicalOf(actual), canonicalOf(expected), `${c.id}: the canonical form of ${what} differs`);
+}
+
+/** The error message must name the path. */
+function assertNamesPath(c: Case, error: unknown, file: string): void {
+  const message = error instanceof Error ? error.message : String(error);
+  assert.ok(message.includes(file), `${c.id}: the error message must name ${file}`);
+}
+
+/** The UUID pattern of the schema that the corpus pins. The schema is at `../../schemas/<release>/` of the corpus. */
+function uuidPattern(corpusDir: string): RegExp {
+  const release = path.basename(corpusDir);
+  const schemaPath = path.join(corpusDir, "..", "..", "schemas", release, "oscal_complete_schema.json");
+  const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8")) as { definitions: { UUIDDatatype: { pattern: string } } };
+  return new RegExp(schema.definitions.UUIDDatatype.pattern);
+}
+
 /** Runs `action`, which must throw an error of category `category`. Returns that error. */
 function reports(adapter: Adapter, c: Case, category: string, action: () => unknown): unknown {
   let error: unknown;
@@ -74,24 +95,13 @@ function checkFailureCount(adapter: Adapter, c: Case, error: unknown): void {
 /**
  * The operations of the corpus that runCase has no rules for yet. The change that adds the rules of an operation
  * removes it from this list. Until then, each case of the operation is in expected-failures.json, because runCase
- * rejects an operation that it does not know. Operations: facade (#31), build-hash (#31), build-rlink (#31).
+ * rejects an operation that it does not know. The list is empty, because runCase has rules for each operation.
  */
-export const PENDING_OPERATIONS: ReadonlySet<string> = new Set(["facade", "build-hash", "build-rlink"]);
+export const PENDING_OPERATIONS: ReadonlySet<string> = new Set();
 
-/**
- * The field of a `build-resource` case that runCase has no rule for yet (#31), or `undefined` when runCase has a rule
- * for each field of the case.
- */
-function pendingField(c: Case): string | undefined {
-  if (c.operation !== "build-resource") return undefined;
-  if (c["expected-element"] !== undefined) return "expected-element";
-  if (c.arguments?.["document-ids"] !== undefined) return "document-ids";
-  return undefined;
-}
-
-/** True when runCase rejects the case: its operation is pending, or it has a field that has no rule yet. */
+/** True when runCase rejects the case, because its operation is pending. */
 export function isPendingCase(c: Case): boolean {
-  return PENDING_OPERATIONS.has(c.operation) || pendingField(c) !== undefined;
+  return PENDING_OPERATIONS.has(c.operation);
 }
 
 /** Runs one corpus case through the adapter. Throws when the binding does not give the expected result. */
@@ -121,8 +131,7 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
     case "parse-file": {
       const file = path.join(corpusDir, c.input);
       const error = reports(adapter, c, category, () => adapter.parseFile(file));
-      const message = error instanceof Error ? error.message : String(error);
-      assert.ok(message.includes(file), `${c.id}: the error message must name ${file}`);
+      assertNamesPath(c, error, file);
       return;
     }
     case "assessment-period": {
@@ -145,16 +154,59 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
       assert.deepEqual(adapter.elementTypes(), names, `${c.id}: the element types differ from ${c.expected}`);
       return;
     }
+    case "facade": {
+      const form = c["input-form"];
+      const file = path.join(corpusDir, c.input);
+      const build = () =>
+        form === "bytes"
+          ? adapter.facadeFromBytes(inputOf(corpusDir, c) as Uint8Array)
+          : form === "path"
+            ? adapter.facadeFromPath(file)
+            : adapter.facade(adapter.parse(inputOf(corpusDir, c)));
+      if (category !== undefined) {
+        assertNamesPath(c, reports(adapter, c, category, build), file);
+        return;
+      }
+      const view = build();
+      const wrapper = JSON.parse(fs.readFileSync(path.join(corpusDir, c.expected as string), "utf8")) as Record<string, unknown>;
+      const body = wrapper[c["document-type"] as string] as { metadata: Record<string, unknown>; uuid: string };
+      assertCanonicalEqual(corpusDir, c, JSON.stringify(view.wrapper), "the facade wrapper");
+      assertElementEqual(c, view.body, body, "the facade body");
+      assertElementEqual(c, view.metadata, body.metadata, "the facade metadata");
+      assert.equal(view.oscalVersion, body.metadata["oscal-version"], `${c.id}: wrong OSCAL version`);
+      assert.equal(view.uuid, body.uuid, `${c.id}: wrong body uuid`);
+      return;
+    }
+    case "build-hash":
+    case "build-rlink": {
+      const build = () =>
+        c.operation === "build-hash"
+          ? adapter.buildHash((c.arguments ?? {}) as { value: string; algorithm?: string })
+          : adapter.buildRlink((c.arguments ?? {}) as { href: string; "media-type"?: string; hashes?: unknown[] });
+      if (category !== undefined) {
+        reports(adapter, c, category, build);
+        return;
+      }
+      assertElementEqual(c, build(), c["expected-element"], "the result");
+      return;
+    }
     case "build-resource": {
-      const field = pendingField(c);
-      if (field !== undefined) assert.fail(`${c.id}: pending: ${field} (#31)`);
-      const args = (c.arguments ?? {}) as { key?: string; title?: string; identifier?: string };
+      const args = (c.arguments ?? {}) as { key?: string; title?: string; identifier?: string; "document-ids"?: unknown[] };
       if (category !== undefined) {
         reports(adapter, c, category, () => adapter.buildResource(args));
         return;
       }
-      const resource = adapter.buildResource(args) as { uuid?: unknown };
-      assert.equal(resource.uuid, c["expected-uuid"], `${c.id}: wrong uuid`);
+      const resource = adapter.buildResource(args) as Record<string, unknown>;
+      if (c["expected-uuid"] !== undefined) assert.equal(resource.uuid, c["expected-uuid"], `${c.id}: wrong uuid`);
+      if (c["expected-element"] !== undefined) {
+        let rest = resource;
+        if (args.key === undefined && args.identifier === undefined) {
+          assert.equal(typeof resource.uuid, "string", `${c.id}: the generated uuid is not a string`);
+          assert.match(resource.uuid as string, uuidPattern(corpusDir), `${c.id}: the generated uuid is not a UUID`);
+          rest = Object.fromEntries(Object.entries(resource).filter(([key]) => key !== "uuid"));
+        }
+        assertElementEqual(c, rest, c["expected-element"], "the resource");
+      }
       return;
     }
     case "yaml-round-trip": {

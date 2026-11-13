@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
-import type { Adapter } from "./support/adapter.ts";
+import type { Adapter, FacadeView } from "./support/adapter.ts";
 import { checkListedIds, isPendingCase, loadCorpus, runCase, runWithExpectation, type Case } from "./support/runner.ts";
 
 const corpus = loadCorpus(artifactPaths(await ensureSpecArtifact()).corpus);
@@ -25,6 +26,21 @@ function conforming(c: Case): Adapter {
   };
   const expectedJson = () => fs.readFileSync(path.join(corpus.dir, c.expected as string), "utf8");
   const throwing = c["expected-category"] !== undefined;
+  /** The facade view of the wrapper at `expected`. */
+  const view = (): FacadeView => {
+    const wrapper = JSON.parse(expectedJson()) as Record<string, { metadata: Record<string, string>; uuid: string }>;
+    const body = wrapper[c["document-type"] as string];
+    return { wrapper, body, metadata: body.metadata, oscalVersion: body.metadata["oscal-version"], uuid: body.uuid };
+  };
+  /** A builder that checks its arguments, and then answers from the corpus data of the case. */
+  const build = (args: unknown): unknown => {
+    assert.deepEqual(args, c.arguments);
+    if (throwing) throw new FakeError(c["expected-category"] as string, 1, "the builder fails");
+    if (c["expected-uuid"] !== undefined) return { uuid: c["expected-uuid"] };
+    const element = structuredClone(c["expected-element"]) as Record<string, unknown>;
+    const generated = c.operation === "build-resource" && c.arguments?.key === undefined && c.arguments?.identifier === undefined;
+    return generated ? { ...element, uuid: randomUUID() } : element;
+  };
   return {
     parse: () => (c.operation === "parse" || c.operation === "yaml-parse" ? fail() : {}),
     parseTyped: () => (c.operation === "parse-typed" ? fail() : {}),
@@ -36,14 +52,18 @@ function conforming(c: Case): Adapter {
     assessmentPeriod: fail,
     parseYaml: () => (c.operation === "yaml-parse" ? fail() : {}),
     serializeYaml: () => "",
-    buildResource: () => {
-      if (throwing) throw new FakeError(c["expected-category"] as string, 1, "the builder fails");
-      return { uuid: c["expected-uuid"] };
-    },
+    facade: view,
+    facadeFromBytes: view,
+    facadeFromPath: (): FacadeView => (throwing ? fail() : view()),
+    buildHash: build,
+    buildRlink: build,
+    buildResource: build,
     category: (error) => (error as FakeError).category,
     failureCount: (error) => (error as FakeError).count,
   };
 }
+
+const byId = (id: string) => corpus.cases.find((c) => c.id === id) as Case;
 
 const firstOf = (operation: string, where: (c: Case) => boolean = () => true) =>
   corpus.cases.find((c) => c.operation === operation && where(c)) as Case;
@@ -162,8 +182,97 @@ const changes: Array<[string, Case, (a: Adapter, c: Case) => Partial<Adapter>]> 
   ],
   [
     "build-resource: wrong category",
-    firstOf("build-resource", (c) => c["expected-category"] !== undefined && !isPendingCase(c)),
+    firstOf("build-resource", (c) => c["expected-category"] !== undefined),
     () => ({ category: () => "other" }),
+  ],
+  ...(
+    [
+      ["wrapper", { wrapper: {} }],
+      ["body", { body: {} }],
+      ["metadata", { metadata: {} }],
+      ["oscalVersion", { oscalVersion: "0.0.0" }],
+      ["uuid", { uuid: "not-the-uuid" }],
+    ] as Array<[string, Partial<FacadeView>]>
+  ).map(
+    ([field, other]): [string, Case, (a: Adapter, c: Case) => Partial<Adapter>] => [
+      `facade: another ${field}`,
+      byId("facade/catalog"),
+      (a) => ({ facade: (d) => ({ ...a.facade(d), ...other }) }),
+    ],
+  ),
+  [
+    "facade: the construction from a parsed document throws",
+    byId("facade/catalog"),
+    () => ({
+      facade: () => {
+        throw new Error("x");
+      },
+    }),
+  ],
+  [
+    "facade: the construction from bytes throws",
+    byId("facade/profile"),
+    () => ({
+      facadeFromBytes: () => {
+        throw new Error("x");
+      },
+    }),
+  ],
+  [
+    "facade: the construction from a path throws",
+    byId("facade/component-definition"),
+    () => ({
+      facadeFromPath: () => {
+        throw new Error("x");
+      },
+    }),
+  ],
+  [
+    "facade: message lacks the path",
+    byId("facade/missing-file"),
+    () => ({
+      facadeFromPath: () => {
+        throw new FakeError("not-found", 1, "no such file");
+      },
+    }),
+  ],
+  [
+    "build-hash: another algorithm",
+    byId("build-hash/off-list-algorithm"),
+    (a) => ({ buildHash: (args) => ({ ...(a.buildHash(args) as object), algorithm: "SHA-256" }) }),
+  ],
+  ["build-hash: no error", byId("build-hash/invalid-algorithm"), () => ({ buildHash: () => ({}) })],
+  [
+    "build-rlink: a media-type in the result",
+    byId("build-rlink/reference-only"),
+    (a) => ({ buildRlink: (args) => ({ ...(a.buildRlink(args) as object), "media-type": "text/plain" }) }),
+  ],
+  [
+    "build-resource: generated uuid is not a UUID",
+    byId("build-resource/generated-identifier"),
+    (a) => ({ buildResource: (args) => ({ ...(a.buildResource(args) as object), uuid: "not-a-uuid" }) }),
+  ],
+  [
+    "build-resource: another title",
+    byId("build-resource/generated-identifier"),
+    (a) => ({ buildResource: (args) => ({ ...(a.buildResource(args) as object), title: "Other Title" }) }),
+  ],
+  [
+    "build-resource: another uuid in the result",
+    byId("build-resource/omitted-inputs"),
+    (a) => ({
+      buildResource: (args) => ({ ...(a.buildResource(args) as object), uuid: "00000000-0000-5000-8000-000000000000" }),
+    }),
+  ],
+  [
+    "build-resource: no document-ids given to the builder",
+    byId("build-resource/invalid-document-id"),
+    () => ({
+      buildResource: (args) => {
+        if (args["document-ids"] !== undefined) return {};
+        throw new FakeError("builder-error", 1, "the builder fails");
+      },
+    }),
   ],
   ["yaml-parse: no error", firstOf("yaml-parse"), () => ({ parseYaml: () => ({}) })],
   ["yaml-parse: wrong category", firstOf("yaml-parse"), () => ({ category: () => "other" })],
@@ -188,6 +297,15 @@ test("a case of the corpus has the bytes input form that the runner passes as by
     }),
   );
   assert.ok(seen instanceof Uint8Array);
+});
+
+test("the facade case of the bytes input form gives raw bytes to the facade", () => {
+  const c = byId("facade/profile");
+  let seen: unknown;
+  const base = conforming(c);
+  runCase({ ...base, facadeFromBytes: (i) => ((seen = i), base.facadeFromBytes(i)) }, corpus.dir, c);
+  assert.ok(seen instanceof Uint8Array);
+  assert.deepEqual(seen, new Uint8Array(fs.readFileSync(path.join(corpus.dir, c.input))));
 });
 
 test("expected failures: a listed case that fails passes", () => {

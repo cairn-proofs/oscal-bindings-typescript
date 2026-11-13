@@ -4,9 +4,10 @@
  * runner in runner.ts holds the rules of the corpus, so no other file changes.
  */
 
-import { buildResource } from "../../src/backmatter.ts";
+import { buildHash, buildResource, buildRlink, type ResourceOptions, type RlinkOptions } from "../../src/backmatter.ts";
+import { OscalDoc } from "../../src/document.ts";
 import { OscalError, ParseError } from "../../src/errors.ts";
-import type { OscalDocument } from "../../src/generated/oscal.ts";
+import type { HashAlgorithm, OscalDocument } from "../../src/generated/oscal.ts";
 import {
   isValid,
   parse,
@@ -51,6 +52,24 @@ function notImplemented(operation: string): never {
 /** The corpus error categories (cases.json, `categories`). */
 export type Category = string;
 
+/** FAC-002: the values that the facade reads. */
+export interface FacadeView {
+  wrapper: unknown;
+  body: unknown;
+  metadata: unknown;
+  oscalVersion: string;
+  uuid: string;
+}
+
+/** The five values of a facade. */
+const viewOf = (doc: OscalDoc): FacadeView => ({
+  wrapper: doc.wrapper,
+  body: doc.body,
+  metadata: doc.metadata,
+  oscalVersion: doc.oscalVersion,
+  uuid: doc.uuid,
+});
+
 /** The operations of the binding that the corpus uses. */
 export interface Adapter {
   /** PRS-001: the generic parse. */
@@ -73,8 +92,18 @@ export interface Adapter {
   parseYaml(input: string | Uint8Array): unknown;
   /** YML-008: the serialization to YAML. */
   serializeYaml(document: unknown): string;
+  /** FAC-001: the facade of a parsed document. */
+  facade(document: unknown): FacadeView;
+  /** FAC-003: the facade of raw bytes. */
+  facadeFromBytes(input: Uint8Array): FacadeView;
+  /** FAC-003: the facade of a file path. */
+  facadeFromPath(path: string): FacadeView;
+  /** BMB-001: the hash builder. Returns the hash. */
+  buildHash(args: { value: string; algorithm?: string }): unknown;
+  /** BMB-002: the rlink builder. Returns the rlink. */
+  buildRlink(args: { href: string; "media-type"?: string; hashes?: unknown[] }): unknown;
   /** BMB-004: the resource builder. The `identifier` argument is the `uuid` option. Returns the resource. */
-  buildResource(args: { key?: string; title?: string; identifier?: string }): unknown;
+  buildResource(args: { key?: string; title?: string; identifier?: string; "document-ids"?: unknown[] }): unknown;
   /** The corpus category of an error that an operation threw. */
   category(error: unknown): Category;
   /** The count of structured failure entries of a parse error. */
@@ -96,7 +125,12 @@ export const adapter: Adapter = {
   assessmentPeriod: () => notImplemented("assessmentPeriod"),
   parseYaml,
   serializeYaml: (document) => serializeYaml(document as OscalDocument),
-  buildResource: ({ identifier, ...rest }) => buildResource({ ...rest, uuid: identifier }),
+  facade: (document) => viewOf(new OscalDoc(document as OscalDocument)),
+  facadeFromBytes: (input) => viewOf(OscalDoc.fromJson(input)),
+  facadeFromPath: (path) => viewOf(OscalDoc.fromFile(path)),
+  buildHash: ({ value, algorithm }) => buildHash(value, algorithm as HashAlgorithm | undefined),
+  buildRlink: ({ href, ...options }) => buildRlink(href, options as RlinkOptions),
+  buildResource: ({ identifier, ...rest }) => buildResource({ ...(rest as ResourceOptions), uuid: identifier }),
   category: (error) => {
     if (error instanceof OscalError) return error.category;
     throw error;
