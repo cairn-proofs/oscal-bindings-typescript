@@ -3,7 +3,7 @@
  * the operation at its first failure, so the binding does no more work on input that is known to be invalid.
  */
 import fs from "node:fs";
-import { DocumentTypeMismatchError, NotFoundError, ParseError } from "./errors.ts";
+import { DocumentTypeMismatchError, NotFoundError, ParseError, ReadError } from "./errors.ts";
 import type {
   AssessmentPlanDocument,
   AssessmentResultsDocument,
@@ -15,7 +15,14 @@ import type {
   ProfileDocument,
   SystemSecurityPlanDocument,
 } from "./generated/oscal.ts";
-import { collect, depthLimitMessage, documentValidators, exceedsDepthLimit, rootKeys } from "./validators.ts";
+import {
+  collectSelected,
+  depthLimitMessage,
+  documentValidators,
+  exceedsDepthLimit,
+  passes,
+  rootKeys,
+} from "./validators.ts";
 
 type Input = string | Uint8Array;
 
@@ -67,8 +74,8 @@ function read(input: Input, expected?: string): { value: unknown; rootKey: strin
 /** The pipeline of every parse operation. The typed parsers pass the expected root key. */
 function parseInput(input: Input, expected?: string): unknown {
   const { value, rootKey } = read(input, expected);
-  if (documentValidators(rootKey).failFast(value)) return value;
-  const failures = collect(documentValidators(rootKey).full, value);
+  if (passes(documentValidators(rootKey).failFast, value)) return value;
+  const failures = collectSelected(documentValidators(rootKey).full, value);
   throw new ParseError(`the ${rootKey} document is not valid at ${failures.length} location(s)`, failures);
 }
 
@@ -78,8 +85,9 @@ export function parse(input: string | Uint8Array): OscalDocument {
 }
 
 /**
- * Reads an OSCAL document from a file path (PRS-002). Throws a `NotFoundError` for a path that does not exist. Any
- * other read error passes through unchanged, because the contract defines no category for it.
+ * Reads an OSCAL document from a file path (PRS-002). Throws a `NotFoundError` for a path that does not exist
+ * (ERR-006). Throws a `ReadError` for a path that exists and cannot be read, for example a directory (ERR-012). Its
+ * `cause` holds the Node error. A `TypeError` for an argument that is not a path passes through unchanged.
  */
 export function parseFile(path: string): OscalDocument {
   let bytes: Uint8Array;
@@ -88,7 +96,8 @@ export function parseFile(path: string): OscalDocument {
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT" || code === "ENOTDIR") throw new NotFoundError(path);
-    throw error;
+    if (error instanceof TypeError) throw error;
+    throw new ReadError(path, { cause: error });
   }
   return parse(bytes);
 }
@@ -97,7 +106,7 @@ export function parseFile(path: string): OscalDocument {
 export function isValid(input: string | Uint8Array): boolean {
   try {
     const { value, rootKey } = read(input);
-    return documentValidators(rootKey).failFast(value) === true;
+    return passes(documentValidators(rootKey).failFast, value);
   } catch {
     return false;
   }

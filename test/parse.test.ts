@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
-import { DocumentTypeMismatchError, NotFoundError, OscalError, ParseError } from "../src/errors.ts";
+import { DocumentTypeMismatchError, NotFoundError, OscalError, ParseError, ReadError } from "../src/errors.ts";
 import {
   isValid,
   parse,
@@ -141,8 +141,38 @@ test("isValid returns false and does not throw for each invalid corpus input", (
   assert.equal(isValid(undefined as unknown as string), false);
 });
 
-test("parseFile throws an error that is not an OscalError for a directory", () => {
-  assert.throws(() => parseFile(os.tmpdir()), (e) => e instanceof Error && !(e instanceof OscalError));
+/** Whether an error is a `ReadError` that names a path, and is not a parse error or a not-found error (ERR-012). */
+const isReadErrorOf = (file: string) => (e: unknown) =>
+  e instanceof ReadError &&
+  e.category === "read-error" &&
+  e.path === file &&
+  e.message.includes(file) &&
+  !(e instanceof ParseError) &&
+  !(e instanceof NotFoundError);
+
+test("ERR-012.01 ERR-012.03 parseFile of a directory throws a ReadError that names the path", () => {
+  const dir = os.tmpdir();
+  assert.throws(() => parseFile(dir), isReadErrorOf(dir));
+});
+
+test(
+  "ERR-012.02 parseFile of a file without read permission throws a ReadError that names the path",
+  { skip: process.getuid?.() === 0 || process.getuid?.() === undefined ? "root can read a file with mode 000" : false },
+  () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "oscal-parse-"));
+    try {
+      const file = path.join(dir, "catalog.json");
+      fs.copyFileSync(path.join(paths.corpus, validCases[0].input), file);
+      fs.chmodSync(file, 0o000);
+      assert.throws(() => parseFile(file), isReadErrorOf(file));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  },
+);
+
+test("parseFile of a path that holds a NUL character throws a TypeError that is not an OscalError", () => {
+  assert.throws(() => parseFile("bad\0path.json"), (e) => e instanceof TypeError && !(e instanceof OscalError));
 });
 
 test("parseFile throws a NotFoundError for a path through a file", () => {

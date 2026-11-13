@@ -15,6 +15,7 @@
         "PRS-011",
         "PRS-012",
         "PRS-013",
+        "PRS-014",
         "ERR-001",
         "ERR-003",
         "ERR-004",
@@ -36,13 +37,15 @@
       "name": "parseFile",
       "requirements": [
         "PRS-002",
-        "ERR-006"
+        "ERR-006",
+        "ERR-012"
       ]
     },
     {
       "name": "parseCatalog",
       "requirements": [
         "PRS-003",
+        "PRS-014",
         "ERR-005",
         "ERR-009"
       ]
@@ -51,6 +54,7 @@
       "name": "parseMappingCollection",
       "requirements": [
         "PRS-003",
+        "PRS-014",
         "ERR-005",
         "ERR-009"
       ]
@@ -59,6 +63,7 @@
       "name": "parseProfile",
       "requirements": [
         "PRS-003",
+        "PRS-014",
         "ERR-005",
         "ERR-009"
       ]
@@ -67,6 +72,7 @@
       "name": "parseComponentDefinition",
       "requirements": [
         "PRS-003",
+        "PRS-014",
         "ERR-005",
         "ERR-009"
       ]
@@ -75,6 +81,7 @@
       "name": "parseSystemSecurityPlan",
       "requirements": [
         "PRS-003",
+        "PRS-014",
         "ERR-005",
         "ERR-009"
       ]
@@ -83,6 +90,7 @@
       "name": "parseAssessmentPlan",
       "requirements": [
         "PRS-003",
+        "PRS-014",
         "ERR-005",
         "ERR-009"
       ]
@@ -91,6 +99,7 @@
       "name": "parseAssessmentResults",
       "requirements": [
         "PRS-003",
+        "PRS-014",
         "ERR-005",
         "ERR-009"
       ]
@@ -99,6 +108,7 @@
       "name": "parsePlanOfActionAndMilestones",
       "requirements": [
         "PRS-003",
+        "PRS-014",
         "ERR-005",
         "ERR-009"
       ]
