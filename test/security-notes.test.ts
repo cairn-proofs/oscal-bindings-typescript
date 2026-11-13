@@ -10,7 +10,7 @@ import path from "node:path";
 import { test } from "node:test";
 import * as backmatter from "../src/backmatter.ts";
 import * as documentModule from "../src/document.ts";
-import { NotFoundError, OscalError, ParseError } from "../src/errors.ts";
+import { NotFoundError, ParseError, ReadError } from "../src/errors.ts";
 import type { OscalDocument } from "../src/generated/oscal.ts";
 import * as parseModule from "../src/parse.ts";
 import { serialize } from "../src/serialize.ts";
@@ -84,6 +84,7 @@ test("each operation that the notes name exists", () => {
     serialize,
     NotFoundError,
     ParseError,
+    ReadError,
   };
   const names = [
     "parse",
@@ -96,6 +97,7 @@ test("each operation that the notes name exists", () => {
     "buildResource",
     "ParseError",
     "NotFoundError",
+    "ReadError",
   ];
   const section = readme.slice(readme.indexOf(SECTION));
   for (const name of names) {
@@ -137,14 +139,14 @@ test('security note "Error text": a ParseError carries text of the input documen
   );
 });
 
-test('security note "Error text": NotFoundError names the path, and other file system errors pass through', () => {
+test('security note "Error text": NotFoundError and ReadError name the path, and cause holds the Node error', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "oscal-notes-"));
   try {
     const missing = path.join(dir, "missing.json");
     assert.throws(() => parseFile(missing), (e) => e instanceof NotFoundError && e.path === missing, stale("Error text"));
     assert.throws(
       () => parseFile(dir),
-      (e) => !(e instanceof OscalError) && (e as NodeJS.ErrnoException).code === "EISDIR",
+      (e) => e instanceof ReadError && e.path === dir && (e.cause as NodeJS.ErrnoException).code === "EISDIR",
       stale("Error text"),
     );
   } finally {

@@ -259,3 +259,28 @@ export const elementTypes: readonly ElementType[] = [
   { elementType: "threat-id", typeName: "ThreatId", pointer: "#/definitions/oscal-complete-oscal-assessment-common:threat-id" },
   { elementType: "threat-id-system", typeName: "ThreatIdSystem", pointer: "#/definitions/oscal-complete-oscal-assessment-common:threat-id/properties/system" },
 ];
+
+/** One row for each site of a nested union of the manifest (NAM-020). */
+export interface UnionSite {
+  /** The JSON pointer of the schema node that holds the `anyOf` of the union. */
+  readonly pointer: string;
+  /** The variants of the union, in manifest order. */
+  readonly variants: readonly { readonly property: string; readonly typeName: string }[];
+}
+
+/** One row for each site of each union of the manifest, in manifest order. */
+export const unionSites: readonly UnionSite[] = [
+  { pointer: "#/definitions/oscal-complete-oscal-assessment-common:assessment-subject", variants: [{ property: "include-all", typeName: "AssessmentSubjectWithIncludeAll" }, { property: "include-subjects", typeName: "AssessmentSubjectWithIncludeSubjects" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-catalog:group", variants: [{ property: "controls", typeName: "CatalogGroupWithControls" }, { property: "groups", typeName: "CatalogGroupWithGroups" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-mapping-common:confidence-score", variants: [{ property: "category", typeName: "ConfidenceScoreWithCategory" }, { property: "percentage", typeName: "ConfidenceScoreWithPercentage" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-assessment-common:reviewed-controls/properties/control-objective-selections/items", variants: [{ property: "include-all", typeName: "ControlObjectiveSelectionWithIncludeAll" }, { property: "include-objectives", typeName: "ControlObjectiveSelectionWithIncludeObjectives" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-assessment-common:reviewed-controls/properties/control-selections/items", variants: [{ property: "include-all", typeName: "ControlSelectionWithIncludeAll" }, { property: "include-controls", typeName: "ControlSelectionWithIncludeControls" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-profile:import", variants: [{ property: "include-all", typeName: "ImportWithIncludeAll" }, { property: "include-controls", typeName: "ImportWithIncludeControls" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-profile:insert-controls", variants: [{ property: "include-all", typeName: "InsertControlsWithIncludeAll" }, { property: "include-controls", typeName: "InsertControlsWithIncludeControls" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-profile:merge", variants: [{ property: "as-is", typeName: "MergeWithAsIs" }, { property: "custom", typeName: "MergeWithCustom" }, { property: "flat", typeName: "MergeWithFlat" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-metadata:metadata/properties/parties/items", variants: [{ property: "addresses", typeName: "MetadataPartyWithAddresses" }, { property: "location-uuids", typeName: "MetadataPartyWithLocationUuids" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-profile:modify/properties/set-parameters/items", variants: [{ property: "select", typeName: "ModifySetParameterWithSelect" }, { property: "values", typeName: "ModifySetParameterWithValues" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-control-common:parameter", variants: [{ property: "select", typeName: "ParameterWithSelect" }, { property: "values", typeName: "ParameterWithValues" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-profile:group", variants: [{ property: "groups", typeName: "ProfileGroupWithGroups" }, { property: "insert-controls", typeName: "ProfileGroupWithInsertControls" }] },
+  { pointer: "#/definitions/oscal-complete-oscal-assessment-common:task/properties/timing", variants: [{ property: "at-frequency", typeName: "TaskTimingWithAtFrequency" }, { property: "within-date-range", typeName: "TaskTimingWithDateRange" }, { property: "on-date", typeName: "TaskTimingWithOnDate" }] },
+];

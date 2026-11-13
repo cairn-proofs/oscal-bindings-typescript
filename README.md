@@ -33,8 +33,8 @@ What exists:
   resource. `buildHash` uses SHA-256 when the caller omits the algorithm. `buildResource` generates a UUID when the
   caller omits `uuid`. Each builder validates its result, and an omitted optional input is absent from the result. An
   invalid input gives a `ParseError` that carries one entry for each failing location.
-- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `LimitExceededError`, `NotFoundError`, and
-  `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing location. Use
+- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `LimitExceededError`, `NotFoundError`,
+  `ReadError`, and `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing location. Use
   `instanceof` to test the category of an error. A `DocumentTypeMismatchError` is also a `ParseError`, but a
   `ParseError` is not a `DocumentTypeMismatchError`. The `category` property holds the most specific category. The
   `limit` property identifies the limit that stopped an operation, for example `nesting-depth`. Test it with
@@ -109,7 +109,8 @@ Each note has three parts: the risk, what you lose, and what to do.
 **Risk.** `parse`, `parseFile`, and `isValid` decode, parse, and check a document in one synchronous call. The binding
 limits the nesting depth (see [Limits](#limits)). It sets no limit on the size of the input. An attacker who can send you
 a very large document can block your event loop and use much memory. An invalid large document costs more. The binding
-checks it twice and builds one failure entry for each bad location.
+checks it again for each nested union that selects a branch above a failure, and builds one failure entry for each bad
+location. Only `CatalogGroup` and `ProfileGroup` can hold themselves, so a deep stack of groups multiplies this cost.
 
 **What you lose.** Your service can become unavailable.
 
@@ -123,16 +124,16 @@ checks it twice and builds one failure entry for each bad location.
 
 **Risk.** An error can contain text that an attacker chose. A `ParseError` carries keys and values of the input document
 in `failures[].location` and `failures[].messages`. An attacker can put long strings, control characters, or markup
-there. These can fill your logs or add fake log lines. If you show `NotFoundError.path` or Node file system error text
-(for example `EACCES` and `EISDIR`) to an attacker, it tells them which files exist, their permissions, and their
-absolute paths.
+there. These can fill your logs or add fake log lines. If you show `NotFoundError.path`, `ReadError.path`, or the Node file
+system error in `ReadError.cause` (for example `EACCES` and `EISDIR`) to an attacker, it tells them which files exist,
+their permissions, and their absolute paths.
 
 **What you lose.** Your logs can contain false entries. An attacker can learn the layout of your file system.
 
 **What to do.**
 
-1. Treat `failures[].location`, `failures[].messages`, `NotFoundError.path`, and the text of a Node file system error as
-   untrusted.
+1. Treat `failures[].location`, `failures[].messages`, `NotFoundError.path`, `ReadError.path`, and the text of the Node
+   file system error in `ReadError.cause` as untrusted.
 2. Do not show this text to an end user. Show a generic message instead.
 3. Write this text to a log. Use `JSON.stringify` and a length cap.
 

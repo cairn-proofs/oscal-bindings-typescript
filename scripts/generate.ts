@@ -262,6 +262,17 @@ export function generate(schema: Json, manifest: Manifest): GenerateResult {
         `  { elementType: ${JSON.stringify(r.elementType)}, typeName: ${JSON.stringify(r.typeName)}, ` +
         `pointer: ${JSON.stringify(r.pointer)} },`,
     );
+  // The table of union sites (NAM-020).
+  const unionSites = manifest.types
+    .filter((entry) => entry.kind === "union")
+    .flatMap((entry) =>
+      entry.sites.map((site) => {
+        const variants = entry.variants!.map(
+          (v) => `{ property: ${JSON.stringify(v.property)}, typeName: ${JSON.stringify(v.type)} }`,
+        );
+        return `  { pointer: ${JSON.stringify(site)}, variants: [${variants.join(", ")}] },`;
+      }),
+    );
   const elementTypes = [
     header.trimEnd(),
     "",
@@ -278,6 +289,19 @@ export function generate(schema: Json, manifest: Manifest): GenerateResult {
     "/** One row for each manifest type, sorted by element-type name. */",
     "export const elementTypes: readonly ElementType[] = [",
     ...table,
+    "];",
+    "",
+    "/** One row for each site of a nested union of the manifest (NAM-020). */",
+    "export interface UnionSite {",
+    "  /** The JSON pointer of the schema node that holds the `anyOf` of the union. */",
+    "  readonly pointer: string;",
+    "  /** The variants of the union, in manifest order. */",
+    "  readonly variants: readonly { readonly property: string; readonly typeName: string }[];",
+    "}",
+    "",
+    "/** One row for each site of each union of the manifest, in manifest order. */",
+    "export const unionSites: readonly UnionSite[] = [",
+    ...unionSites,
     "];",
     "",
   ].join("\n");
