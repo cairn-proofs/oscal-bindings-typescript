@@ -1,5 +1,5 @@
 // The cases are a copy of scripts/check-canonical-json.ts of cairn-proofs/oscal-bindings-specs at the tag
-// v0.7.0+oscal.1.2.3.
+// v0.8.0+oscal.1.2.3.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
