@@ -50,11 +50,10 @@ What exists:
   error has the `limit` key.
 - A conformance runner. It runs each case of `corpus/1.2.3/cases.json` as one test, with the case id as the test name.
   The cases of parsing, the `round-trip` cases, the `yaml-parse` and `yaml-round-trip` cases, the `element/*` cases, the
-  `element-types` case, and the `build-resource` cases of a key pass. The other `build-resource` cases need the fields
-  `expected-element` or `document-ids`. `test/conformance/expected-failures.json` lists each case that needs an
-  operation or a field that does not exist yet. A listed case that passes fails the run, and so does a listed id that is
-  not in the corpus. A change that adds an operation connects it in `test/support/adapter.ts` and removes the cases that
-  it fixes from the list.
+  `element-types` case, the `facade` cases, and the `build-hash`, `build-rlink`, and `build-resource` cases pass.
+  `test/conformance/expected-failures.json` lists each case that needs an operation that does not exist yet. A listed
+  case that passes fails the run, and so does a listed id that is not in the corpus. A change that adds an operation
+  connects it in `test/support/adapter.ts` and removes the cases that it fixes from the list.
 - A traceability record, `openspec/traceability.json`. It has one entry for each exported operation.
   `test/traceability.test.ts` checks the record against the JSON Schema and the requirement index of the pinned spec
   artifact.
