@@ -14,7 +14,7 @@ export type ErrorCategory =
   | "limit-exceeded";
 
 /** The documented limits of the binding (ERR-010). */
-export type Limit = "nesting-depth";
+export type Limit = "nesting-depth" | "alias-expansion";
 
 /** One failing location of a schema failure (PRS-006, design.md D5). */
 export interface FailureEntry {

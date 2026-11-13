@@ -3,7 +3,7 @@
  * the operation at its first failure, so the binding does no more work on input that is known to be invalid.
  */
 import fs from "node:fs";
-import { DocumentTypeMismatchError, NotFoundError, ParseError, ReadError } from "./errors.ts";
+import { NotFoundError, ParseError, ReadError } from "./errors.ts";
 import type {
   AssessmentPlanDocument,
   AssessmentResultsDocument,
@@ -15,53 +15,27 @@ import type {
   ProfileDocument,
   SystemSecurityPlanDocument,
 } from "./generated/oscal.ts";
+import { decodeText } from "./text.ts";
 import {
   collectSelected,
   depthLimitMessage,
   documentValidators,
   exceedsDepthLimit,
   passes,
-  rootKeys,
+  rootKeyOf,
 } from "./validators.ts";
+import { yamlToJson } from "./yaml.ts";
 
 type Input = string | Uint8Array;
 
-const utf8 = new TextDecoder("utf-8", { fatal: true });
-
 /** Stage 1 and 2: the JSON value of the input. */
 function decodeJson(input: Input): unknown {
-  let text: string;
-  if (typeof input === "string") {
-    text = input;
-  } else if (input instanceof Uint8Array) {
-    try {
-      text = utf8.decode(input);
-    } catch {
-      throw new ParseError("the input is not valid UTF-8");
-    }
-  } else {
-    throw new ParseError("the input is not text or bytes");
-  }
+  const text = decodeText(input);
   try {
     return JSON.parse(text);
   } catch (error) {
     throw new ParseError(`the input is not valid JSON: ${(error as Error).message}`);
   }
-}
-
-/** Stage 4: the one root key of the input. Throws for no root key, for two or more, and for a typed mismatch. */
-function rootKeyOf(value: unknown, expected?: string): string {
-  const found =
-    value !== null && typeof value === "object" && !Array.isArray(value)
-      ? Object.keys(value).filter((key) => rootKeys.includes(key))
-      : [];
-  if (found.length === 0) throw new ParseError("the input names no OSCAL document type");
-  if (found.length > 1) {
-    const message = `the input names more than one document type: ${found.join(", ")}`;
-    throw new ParseError(message, [{ location: "", messages: [message] }]);
-  }
-  if (expected !== undefined && found[0] !== expected) throw new DocumentTypeMismatchError(expected, found[0]);
-  return found[0];
 }
 
 /** Stages 1 to 4. Returns the parsed value and its root key. */
@@ -84,22 +58,46 @@ export function parse(input: string | Uint8Array): OscalDocument {
   return parseInput(input) as OscalDocument;
 }
 
-/**
- * Reads an OSCAL document from a file path (PRS-002). Throws a `NotFoundError` for a path that does not exist
- * (ERR-006). Throws a `ReadError` for a path that exists and cannot be read, for example a directory (ERR-012). Its
- * `cause` holds the Node error. A `TypeError` for an argument that is not a path passes through unchanged.
- */
-export function parseFile(path: string): OscalDocument {
-  let bytes: Uint8Array;
+/** The bytes of the file at a path. Throws a `NotFoundError` and a `ReadError` as `parseFile` documents. */
+function readBytes(path: string): Uint8Array {
   try {
-    bytes = fs.readFileSync(path);
+    return fs.readFileSync(path);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT" || code === "ENOTDIR") throw new NotFoundError(path);
     if (error instanceof TypeError) throw error;
     throw new ReadError(path, { cause: error });
   }
-  return parse(bytes);
+}
+
+/**
+ * Reads an OSCAL document from a file path (PRS-002). Throws a `NotFoundError` for a path that does not exist
+ * (ERR-006). Throws a `ReadError` for a path that exists and cannot be read, for example a directory (ERR-012). Its
+ * `cause` holds the Node error. A `TypeError` for an argument that is not a path passes through unchanged.
+ */
+export function parseFile(path: string): OscalDocument {
+  return parse(readBytes(path));
+}
+
+/**
+ * Reads an OSCAL document from YAML text or UTF-8 bytes (YML-005). The result is the result of `parse` for the JSON text
+ * of the input, so each rule of `parse` applies. A scalar that does not match the grammar of its type gives a
+ * `ParseError` with one entry for its location (YML-010). A YAML input that is not one YAML 1.2 document, or that has a
+ * key that is not a scalar, a key two times, or an alias with no anchor, gives a `ParseError` with no entries (YML-002,
+ * YML-003, YML-009). The message of a YAML syntax error holds lines of the input. An input over the limit
+ * `nesting-depth` or `alias-expansion` gives a `ParseError` with that limit (PRS-010).
+ */
+export function parseYaml(input: string | Uint8Array): OscalDocument {
+  return parseInput(yamlToJson(input)) as OscalDocument;
+}
+
+/**
+ * Reads an OSCAL document from the YAML file at a path (YML-006). It reads the file as `parseFile` does, so it throws a
+ * `NotFoundError` for a path that does not exist (ERR-006) and a `ReadError` for a path that exists and cannot be read
+ * (ERR-012). It then parses the bytes as `parseYaml` does.
+ */
+export function parseYamlFile(path: string): OscalDocument {
+  return parseYaml(readBytes(path));
 }
 
 /** Whether the input is a valid OSCAL document. Never throws (ERR-002). */

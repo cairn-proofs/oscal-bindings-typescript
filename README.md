@@ -1,8 +1,8 @@
 # oscal-bindings-typescript
 
 > [!WARNING]
-> **Alpha.** The binding reads, checks, and writes OSCAL JSON. It has no npm package and no stability guarantees, and
-> its API can change without notice.
+> **Alpha.** The binding reads, checks, and writes OSCAL JSON and OSCAL YAML. It has no npm package and no stability
+> guarantees, and its API can change without notice.
 
 Typed TypeScript data bindings for [OSCAL](https://pages.nist.gov/OSCAL/), generated from the NIST JSON Schema and the
 naming manifest published by
@@ -10,7 +10,7 @@ naming manifest published by
 
 ## Status
 
-The repository holds a working binding for OSCAL JSON. It does not read or write YAML yet.
+The repository holds a working binding for OSCAL JSON and OSCAL YAML.
 
 What exists:
 
@@ -20,8 +20,14 @@ What exists:
 - Runtime validators for each type of the manifest, and the element-type registry.
 - Parsing. `parse` and `parseFile` read an OSCAL JSON document. One typed parser reads each of the eight document
   types, for example `parseCatalog`. `isValid` checks a document and never throws.
-- Serialization. `serialize` writes an OSCAL document as OSCAL JSON. The output has an indent of 2 spaces. The
-  `compact` option gives the output without whitespace.
+- YAML parsing. `parseYaml` reads an OSCAL document from YAML text or UTF-8 bytes. `parseYamlFile` reads it from a file
+  path. Each gives the result of `parse` for the JSON text of the input. The schema decides the type of each scalar, so
+  the plain scalar `1.0` at a string location is the string `"1.0"`. A scalar that does not match the grammar of its
+  type gives a `ParseError` with one entry for its location.
+- Serialization. `serialize` writes an OSCAL document as OSCAL JSON. The output has an indent of 2 spaces. The `compact`
+  option gives the output without whitespace. `serializeYaml` writes an OSCAL document as YAML in block style, with an
+  indent of 2 spaces. It writes each key and each string in JSON form, so a string such as `"1.0"` keeps its type when a
+  reader reads the output again.
 - Element validation. `validateElement` checks a standalone element against a named element type, for example
   `observation`. The result states whether the element is valid, and lists one entry for each failing location.
   `supportedElementTypes` returns the sorted list of element-type names.
@@ -34,16 +40,17 @@ What exists:
   caller omits `uuid`. Each builder validates its result, and an omitted optional input is absent from the result. An
   invalid input gives a `ParseError` that carries one entry for each failing location.
 - The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `LimitExceededError`, `NotFoundError`,
-  `ReadError`, and `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing location. Use
-  `instanceof` to test the category of an error. A `DocumentTypeMismatchError` is also a `ParseError`, but a
-  `ParseError` is not a `DocumentTypeMismatchError`. The `category` property holds the most specific category. The
-  `limit` property identifies the limit that stopped an operation, for example `nesting-depth`. Test it with
-  `error.limit !== undefined`, because each error has the `limit` key.
+  `ReadError`, and `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing
+  location. Use `instanceof` to test the category of an error. A `DocumentTypeMismatchError` is also a `ParseError`, but
+  a `ParseError` is not a `DocumentTypeMismatchError`. The `category` property holds the most specific category. The
+  `limit` property identifies the limit that stopped an operation, for example `nesting-depth` or `alias-expansion`.
+  Test it with `error.limit !== undefined`, because each error has the `limit` key.
 - A conformance runner. It runs each case of `corpus/1.2.3/cases.json` as one test, with the case id as the test name.
-  The cases of parsing, the `round-trip` cases, the `element/*` cases, and the `element-types` case pass.
-  `test/conformance/expected-failures.json` lists each case that needs an operation that does not exist yet. A listed
-  case that passes fails the run, and so does a listed id that is not in the corpus. A change that adds an operation
-  connects it in `test/support/adapter.ts` and removes the cases that it fixes from the list.
+  The cases of parsing, the `round-trip` cases, the `yaml-parse` and `yaml-round-trip` cases, the `element/*` cases, and
+  the `element-types` case pass. `test/conformance/expected-failures.json` lists each case that needs an operation that
+  does not exist yet. A listed case that passes fails the run, and so does a listed id that is not in the corpus. A
+  change that adds an operation connects it in `test/support/adapter.ts` and removes the cases that it fixes from the
+  list.
 - A traceability record, `openspec/traceability.json`. It has one entry for each exported operation.
   `test/traceability.test.ts` checks the record against the JSON Schema and the requirement index of the pinned spec
   artifact.
@@ -51,8 +58,6 @@ What exists:
 What does not exist:
 
 - A published npm package
-- YAML reading and writing. The `yaml-parse` and `yaml-round-trip` cases of the conformance corpus fail
-  until it exists.
 - The `assessment-period` operation of the conformance corpus
 
 ## Limits
@@ -62,17 +67,23 @@ limit has these properties:
 
 1. Each object and each array is one level. A scalar adds no level. The root value is level 1, whether it is an object
    or an array.
-2. The limit applies to `parse`, `parseFile`, the typed parsers, `isValid`, `validateElement`, `buildHash`,
-   `buildRlink`, and `buildResource`.
-3. A deeper input gives a `ParseError` from `parse`, `parseFile`, and the typed parsers. A deeper value gives a
-   `LimitExceededError` from `validateElement`, `buildHash`, `buildRlink`, and `buildResource`. Each error has the limit
-   `nesting-depth` in its `limit` property. `isValid` returns false for a deeper input.
+2. The limit applies to `parse`, `parseFile`, `parseYaml`, `parseYamlFile`, the typed parsers, `isValid`,
+   `validateElement`, `buildHash`, `buildRlink`, and `buildResource`. For a YAML input, the levels are the levels of the
+   value that the input reads as, and they include the levels that an alias gives.
+3. A deeper input gives a `ParseError` from `parse`, `parseFile`, `parseYaml`, `parseYamlFile`, and the typed parsers. A
+   deeper value gives a `LimitExceededError` from `validateElement`, `buildHash`, `buildRlink`, and `buildResource`.
+   Each error has the limit `nesting-depth` in its `limit` property. `isValid` returns false for a deeper input.
 4. A `LimitExceededError` is not a `ParseError`. A caller that catches `ParseError` around `validateElement` or a
    builder does not catch it.
 5. A caller cannot change the limit.
 
 The schema checks recurse once for each level. A deeper input or value can make them throw a `RangeError`, so the
 binding stops it first. A valid element that is deeper than 250 levels gives a `LimitExceededError`, not a valid result.
+
+A YAML input has one more limit, `alias-expansion`. `parseYaml` and `parseYamlFile` stop when the aliases of the input
+give more than 100,000 nodes, or more than 10,000,000 characters of scalar text. The count includes the nodes that a
+nested alias gives. The error is a `ParseError` with no entries, and its `limit` property is `alias-expansion`. A caller
+cannot change the limit. The binding has no limit on the size of a YAML input in bytes.
 
 A `ParseError` has no limit on its entries. It carries one entry for each failing location.
 
@@ -106,43 +117,52 @@ Each note has three parts: the risk, what you lose, and what to do.
 
 #### Size and time
 
-**Risk.** `parse`, `parseFile`, and `isValid` decode, parse, and check a document in one synchronous call. The binding
-limits the nesting depth (see [Limits](#limits)). It sets no limit on the size of the input. An attacker who can send you
-a very large document can block your event loop and use much memory. An invalid large document costs more. The binding
-checks it again for each nested union that selects a branch above a failure, and builds one failure entry for each bad
-location. Only `CatalogGroup` and `ProfileGroup` can hold themselves, so a deep stack of groups multiplies this cost.
+**Risk.** `parse`, `parseFile`, `parseYaml`, `parseYamlFile`, and `isValid` decode, parse, and check a document in one
+synchronous call. The binding limits the nesting depth and the alias expansion of a YAML input (see
+[Limits](#limits)). It sets no limit on the size of the input. An attacker who can send you a very large document can
+block your event loop and use much memory. An invalid large document costs more. The binding checks it again for each
+nested union that selects a branch above a failure, and builds one failure entry for each bad location. Only
+`CatalogGroup` and `ProfileGroup` can hold themselves, so a deep stack of groups multiplies this cost.
+
+A YAML input costs more than the same document in JSON. A small YAML input can read as a large tree, up to the limits of
+`alias-expansion`: 10,000,000 characters of scalar text are about 20 MB of memory. A valid YAML document that holds a
+number or a boolean costs more than its JSON form. The check of the tree of text fails, and the collecting check then
+runs one time or more. The JSON checks run again on the result. A document with no number and no boolean has no
+conversion pass.
 
 **What you lose.** Your service can become unavailable.
 
 **What to do.**
 
-1. Cap the size of each request body before you call `parse`, `isValid`, or `OscalDoc.fromJson`.
+1. Cap the size of each request body before you call `parse`, `parseYaml`, `isValid`, or `OscalDoc.fromJson`.
 2. Run the call in a worker thread, or in a bounded queue, with a timeout.
 3. A `ParseError` has no limit on its entries. Return only a set number of failure entries to a caller.
 
 #### Error text
 
 **Risk.** An error can contain text that an attacker chose. A `ParseError` carries keys and values of the input document
-in `failures[].location` and `failures[].messages`. An attacker can put long strings, control characters, or markup
-there. These can fill your logs or add fake log lines. If you show `NotFoundError.path`, `ReadError.path`, or the Node file
-system error in `ReadError.cause` (for example `EACCES` and `EISDIR`) to an attacker, it tells them which files exist,
-their permissions, and their absolute paths.
+in `failures[].location` and `failures[].messages`. The `message` of a `ParseError` for a YAML syntax error holds lines
+of the input. An attacker can put long strings, control characters, or markup there. These can fill your logs or add
+fake log lines. If you show `NotFoundError.path`, `ReadError.path`, or the Node file system error in `ReadError.cause`
+(for example `EACCES` and `EISDIR`) to an attacker, it tells them which files exist, their permissions, and their
+absolute paths.
 
 **What you lose.** Your logs can contain false entries. An attacker can learn the layout of your file system.
 
 **What to do.**
 
-1. Treat `failures[].location`, `failures[].messages`, `NotFoundError.path`, `ReadError.path`, and the text of the Node
-   file system error in `ReadError.cause` as untrusted.
+1. Treat `failures[].location`, `failures[].messages`, the `message` of a `ParseError` for a syntax error,
+   `NotFoundError.path`, `ReadError.path`, and the text of the Node file system error in `ReadError.cause` as untrusted.
 2. Do not show this text to an end user. Show a generic message instead.
 3. Write this text to a log. Use `JSON.stringify` and a length cap.
 
 #### File paths
 
-**Risk.** `parseFile` and `OscalDoc.fromFile` read the file at the path that you give them. The binding does not restrict
-the path. An attacker who controls part of the path can point it at a named pipe, a device file, or a very large file.
-Your process then hangs or runs out of memory. The attacker can also use a symbolic link to make the binding read a file
-outside the folder that you intended. The error text can then show the content of that file.
+**Risk.** `parseFile`, `parseYamlFile`, and `OscalDoc.fromFile` read the file at the path that you give them. The
+binding does not restrict the path. An attacker who controls part of the path can point it at a named pipe, a device
+file, or a very large file. Your process then hangs or runs out of memory. The attacker can also use a symbolic link to
+make the binding read a file outside the folder that you intended. The error text can then show the content of that
+file.
 
 **What you lose.** Your service can become unavailable. An attacker can read local files, for example other security
 plans.
@@ -159,10 +179,10 @@ plans.
 
 #### A valid document is not an authentic document
 
-**Risk.** `parse` and `isValid` tell you that a document has a valid shape. They do not tell you who made it. An attacker
-can send a valid document that names another party as its author, uses a uuid that you know, or states a false
-`oscal-version`. A sender can also deny later that they sent a document that you accepted. You cannot prove that they
-sent it.
+**Risk.** `parse`, `parseYaml`, and `isValid` tell you that a document has a valid shape. They do not tell you who made
+it. An attacker can send a valid document that names another party as its author, uses a uuid that you know, or states a
+false `oscal-version`. A sender can also deny later that they sent a document that you accepted. You cannot prove that
+they sent it.
 
 **What you lose.** You can treat forged content as content from a trusted author. You cannot prove where a document came
 from.
@@ -175,8 +195,9 @@ from.
 
 #### Files that you store and read
 
-**Risk.** The binding does not check who wrote a file. Anyone who can write to your store of OSCAL files can change a file
-before you call `parseFile`. The changed file can still be valid against the schema. The binding then accepts it.
+**Risk.** The binding does not check who wrote a file. Anyone who can write to your store of OSCAL files can change a
+file before you call `parseFile` or `parseYamlFile`. The changed file can still be valid against the schema. The binding
+then accepts it.
 
 **What you lose.** You can accept forged or changed security content as real, for example a changed security plan.
 
@@ -184,7 +205,7 @@ before you call `parseFile`. The changed file can still be valid against the sch
 
 1. Give only one service account write permission on the stores of OSCAL files.
 2. Write a file to a temporary name. Then rename it.
-3. Keep a sha256 or a signature for each file. Check it before you call `parseFile`.
+3. Keep a sha256 or a signature for each file. Check it before you call `parseFile` or `parseYamlFile`.
 
 #### Links in a document
 
@@ -206,9 +227,10 @@ in the page of a user.
 
 #### Check what you build or change
 
-**Risk.** `serialize` and the `OscalDoc` constructor do not check the document against the schema. The constructor throws
-a `TypeError` only for a value that is not a document wrapper. A document with `null` values or without `metadata`
-passes through both. You can then write invalid OSCAL. Or a getter can fail later with a `TypeError`.
+**Risk.** `serialize`, `serializeYaml`, and the `OscalDoc` constructor do not check the document against the schema. The
+constructor throws a `TypeError` only for a value that is not a document wrapper. A document with `null` values or
+without `metadata` passes through each of them. `serializeYaml` writes a `null` as `null`. You can then write invalid
+OSCAL. Or a getter can fail later with a `TypeError`.
 
 **What you lose.** Invalid OSCAL can go to other systems. Or your process can fail at a place that you did not expect.
 
@@ -216,23 +238,26 @@ passes through both. You can then write invalid OSCAL. Or a getter can fail late
 
 1. Call `isValid` on a document from untrusted code or untrusted input. Do this before you wrap it or write it.
 2. Call `isValid` on the output of `serialize` when you write the file for another system.
-3. Call `isValid` on the serialized text again after any change to a parsed document.
+3. `isValid` reads JSON only, and it returns false for YAML text. To check the output of `serializeYaml`, call
+   `parseYaml` on it in a `try` block. A `ParseError` means that the output is not valid OSCAL.
+4. Check the serialized text again after any change to a parsed document. Use `isValid` for JSON, and `parseYaml` for
+   YAML.
 
 The back-matter builders (`buildHash`, `buildRlink`, and `buildResource`) check their result against the schema.
 
 #### Isolation and shared documents
 
 **Risk.** The binding runs in your process. It has no sandbox. Any code in the same process, for example a dependency,
-can call the binding with any input. That code can also change a parsed document after `parse` returns. The binding does
-not detect this.
+can call the binding with any input. That code can also change a parsed document after `parse` or `parseYaml` returns.
+The binding does not detect this.
 
 **What you lose.** A parsed document can change without your knowledge. You can also lose control of what code uses the
 binding.
 
 **What to do.**
 
-1. Review every dependency that runs in that process. The runtime dependencies of the binding are `ajv` and
-   `ajv-formats`.
+1. Review every dependency that runs in that process. The runtime dependencies of the binding are
+   `ajv`, `ajv-formats`, and `yaml`.
 2. Deep-freeze a parsed document, or copy it with `structuredClone`, before you share it with other code.
 
 #### Audit
@@ -242,18 +267,18 @@ file through the binding. No record then shows which file or document it was. Th
 
 **What you lose.** You have no audit trail of access to your OSCAL documents.
 
-**What to do.** Write an audit entry in your own wrapper for each call of `parse`, `parseFile`, `OscalDoc.fromFile`, and
-`serialize`. Record who made the call, what the call was, and when it happened. Record the sha256 of the document. Never
-record the content of the document.
+**What to do.** Write an audit entry in your own wrapper for each call of `parse`, `parseFile`, `parseYaml`,
+`parseYamlFile`, `OscalDoc.fromFile`, `serialize`, and `serializeYaml`. Record who made the call, what the call was, and
+when it happened. Record the sha256 of the document. Never record the content of the document.
 
 #### Install the binding
 
 **Risk.** An attacker can reach you through the way that you install the binding. The attacker can make you install code
 that the maintainer did not release. To do this, the attacker can take a maintainer account, move a branch, rename the
 repository, or publish a look-alike. The attacker can also publish a malicious release of a dependency of `ajv`, for
-example a transitive dependency. Or the attacker can serve a modified `ajv` or `ajv-formats` from the registry. Either
-action can run attacker code in your process or make the binding accept invalid documents. Without your own lockfile, a
-new install can take such a release.
+example a transitive dependency. Or the attacker can serve a modified `ajv`, `ajv-formats`, or `yaml` from the registry.
+Either action can run attacker code in your process or make the binding accept invalid documents. Without your own
+lockfile, a new install can take such a release.
 
 **What you lose.** Your process and your data can come under the control of an attacker. You cannot trust the results of
 the schema check.
@@ -264,7 +289,7 @@ the schema check.
 2. Commit your own lockfile.
 3. Install with `npm ci --ignore-scripts`.
 4. Run `npm audit signatures`.
-5. Review each change in `ajv`, `ajv-formats`, and their dependencies when you update.
+5. Review each change in `ajv`, `ajv-formats`, `yaml`, and their dependencies when you update.
 
 ## Development
 

@@ -13,10 +13,10 @@ import * as documentModule from "../src/document.ts";
 import { NotFoundError, ParseError, ReadError } from "../src/errors.ts";
 import type { OscalDocument } from "../src/generated/oscal.ts";
 import * as parseModule from "../src/parse.ts";
-import { serialize } from "../src/serialize.ts";
+import { serialize, serializeYaml } from "../src/serialize.ts";
 
 const { OscalDoc } = documentModule;
-const { isValid, parse, parseFile } = parseModule;
+const { isValid, parse, parseFile, parseYaml, parseYamlFile } = parseModule;
 const { buildHash, buildRlink } = backmatter;
 
 const root = path.resolve(import.meta.dirname, "..");
@@ -82,6 +82,7 @@ test("each operation that the notes name exists", () => {
     ...backmatter,
     ...documentModule,
     serialize,
+    serializeYaml,
     NotFoundError,
     ParseError,
     ReadError,
@@ -89,8 +90,11 @@ test("each operation that the notes name exists", () => {
   const names = [
     "parse",
     "parseFile",
+    "parseYaml",
+    "parseYamlFile",
     "isValid",
     "serialize",
+    "serializeYaml",
     "OscalDoc",
     "buildHash",
     "buildRlink",
@@ -114,6 +118,12 @@ test('security note "Size and time": the binding sets no limit on the size of th
   assert.ok(parse(padded).catalog, stale("Size and time"));
 });
 
+test('security note "Size and time": the binding sets no limit on the size of a YAML input', () => {
+  const yaml = "catalog:\n  uuid: 5d6e1c9e-0a5f-4c0b-9d54-2f4a2f3c1b11\n  metadata:\n    title: t\n" +
+    '    last-modified: 2024-01-02T03:04:05Z\n    version: "1"\n    oscal-version: 1.2.3\n';
+  assert.ok(parseYaml(`${yaml}${"#".repeat(16 * 1024 * 1024)}`).catalog, stale("Size and time"));
+});
+
 test('security note "Size and time": a ParseError has no limit on its entries', () => {
   const groups = Array.from({ length: 500 }, () => ({}));
   const input = JSON.stringify(catalog({ groups }));
@@ -135,6 +145,14 @@ test('security note "Error text": a ParseError carries text of the input documen
   assert.throws(
     () => parse("SECRET-MARKER-123 is not json"),
     (error) => error instanceof ParseError && error.message.includes("SECRET-MAR"),
+    stale("Error text"),
+  );
+});
+
+test('security note "Error text": the message of a ParseError for a YAML syntax error holds lines of the input', () => {
+  assert.throws(
+    () => parseYaml("catalog: [SECRET-MARKER-123"),
+    (error) => error instanceof ParseError && error.message.includes("SECRET-MARKER-123"),
     stale("Error text"),
   );
 });
@@ -172,7 +190,16 @@ test('security note "File paths": parseFile follows a symbolic link out of the f
       (error) => error instanceof ParseError && error.message.includes("TOPSECRET-VALUE"),
       stale("File paths"),
     );
+    assert.deepEqual(parseYamlFile(path.join(inside, "doc.json")), catalog(), stale("File paths"));
+    fs.writeFileSync(path.join(outside, "secret.yaml"), "catalog: [TOPSECRET-VALUE");
+    fs.symlinkSync(path.join(outside, "secret.yaml"), path.join(inside, "secret.yaml"));
+    assert.throws(
+      () => parseYamlFile(path.join(inside, "secret.yaml")),
+      (error) => error instanceof ParseError && error.message.includes("TOPSECRET-VALUE"),
+      stale("File paths"),
+    );
     assert.equal(parseFile.length, 1, "parseFile takes only a path, so it has no integrity check.");
+    assert.equal(parseYamlFile.length, 1, "parseYamlFile takes only a path, so it has no integrity check.");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -183,6 +210,11 @@ test('security note "A valid document is not an authentic document": a valid doc
   forged.catalog.metadata["oscal-version"] = "0.0.1-forged";
   forged.catalog.metadata.title = "Signed by someone else";
   assert.equal(isValid(JSON.stringify(forged)), true, stale("A valid document is not an authentic document"));
+});
+
+test('security note "A valid document is not an authentic document": a valid YAML document can hold false claims', () => {
+  const yaml = serializeYaml(catalog() as unknown as OscalDocument).replace('"1.2.3"', '"0.0.1-forged"');
+  assert.ok(parseYaml(yaml).catalog, stale("A valid document is not an authentic document"));
 });
 
 test('security note "Links in a document": the schema accepts any URI, and the builder keeps it as given', () => {
@@ -219,6 +251,16 @@ test('security note "Check what you build or change": serialize and the construc
   assert.throws(() => new OscalDoc({} as OscalDocument), TypeError, stale(note));
 });
 
+test('security note "Check what you build or change": serializeYaml does not check the schema, and isValid reads JSON only', () => {
+  const note = "Check what you build or change";
+  const invalid = { catalog: { uuid: "x", metadata: null } } as unknown as OscalDocument;
+  assert.equal(serializeYaml(invalid), '"catalog":\n  "uuid": "x"\n  "metadata": null\n', stale(note));
+  assert.throws(() => parseYaml(serializeYaml(invalid)), ParseError, stale(note));
+  const valid = serializeYaml(catalog() as unknown as OscalDocument);
+  assert.ok(parseYaml(valid).catalog, stale(note));
+  assert.equal(isValid(valid), false, stale(note));
+});
+
 test('security note "Check what you build or change": the back-matter builders check their result', () => {
   assert.throws(() => buildHash("abc", " SHA-256"), ParseError, stale("Check what you build or change"));
 });
@@ -231,6 +273,15 @@ test('security note "Isolation and shared documents": a parsed document is not f
   (doc.body as unknown as Record<string, unknown>).metadata = null;
   assert.equal(isValid(serialize(doc.wrapper)), false, stale(note));
   assert.equal(doc.metadata, null, stale(note));
+});
+
+test('security note "Isolation and shared documents": a document that parseYaml returns is not frozen', () => {
+  const note = "Isolation and shared documents";
+  const document = parseYaml(serializeYaml(catalog() as unknown as OscalDocument));
+  assert.equal(Object.isFrozen(document), false, stale(note));
+  assert.equal(Object.isFrozen(document.catalog), false, stale(note));
+  (document.catalog as unknown as Record<string, unknown>).metadata = null;
+  assert.throws(() => parseYaml(serializeYaml(document)), ParseError, stale(note));
 });
 
 test('security note "Audit": the library source writes no log and no file', () => {
@@ -246,7 +297,11 @@ test('security note "Audit": the library source writes no log and no file', () =
   }
 });
 
-test('security note "Install the binding": the package is private and has two runtime dependencies', () => {
+test('security note "Install the binding": the package is private and has three runtime dependencies', () => {
   assert.equal(packageJson.private, true, `The package is no longer private. ${stale("Install the binding")}`);
-  assert.deepEqual(Object.keys(packageJson.dependencies).sort(), ["ajv", "ajv-formats"], stale("Isolation and shared documents"));
+  assert.deepEqual(
+    Object.keys(packageJson.dependencies).sort(),
+    ["ajv", "ajv-formats", "yaml"],
+    stale("Isolation and shared documents"),
+  );
 });

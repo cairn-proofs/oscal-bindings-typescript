@@ -14,6 +14,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import {
   childPointer,
   type Entry,
@@ -53,6 +54,89 @@ export function validationPointer(entry: Entry): string | undefined {
   if (entry.kind !== "enum") return site;
   const match = /^(.*)\/(?:anyOf|allOf)\/\d+$/.exec(site);
   return match ? match[1] : undefined;
+}
+
+/** The scalar types of a `type` keyword. A scalar type other than `string` is read from YAML text by its grammar. */
+const SCALAR_TYPES = new Set(["string", "number", "integer", "boolean"]);
+
+/**
+ * The problems of a schema for the YAML scalar typing (YML-004, design D5). The conversion loop of `src/yaml.ts` gives
+ * the type that the schema names at a location only when the schema meets three conditions:
+ *
+ * 1. No `type` keyword names more than one type.
+ * 2. No `anyOf` or `oneOf` permits a string and another scalar type at one location.
+ * 3. A property that two branches of one `anyOf` or `oneOf` both define has the same schema in each branch.
+ *
+ * Returns one message for each place that breaks a condition. The array is empty when the schema meets all three.
+ */
+export function yamlTypingProblems(schema: Json): string[] {
+  const problems: string[] = [];
+  const followRef = (n: Json | undefined): Json | undefined =>
+    isObject(n) && typeof n.$ref === "string" ? resolvePointer(schema, n.$ref) : n;
+
+  // The scalar types that a value at a node can have, as far as the node and its references say.
+  const memo = new Map<Json, Set<string>>();
+  const scalarTypes = (start: Json | undefined): Set<string> => {
+    const node = followRef(start);
+    const out = new Set<string>();
+    if (!isObject(node)) return out;
+    const cached = memo.get(node);
+    if (cached) return cached;
+    memo.set(node, out);
+    for (const type of Array.isArray(node.type) ? node.type : [node.type]) {
+      if (typeof type === "string" && SCALAR_TYPES.has(type)) out.add(type);
+    }
+    for (const keyword of ["allOf", "anyOf", "oneOf"]) {
+      const branches = node[keyword];
+      if (Array.isArray(branches)) for (const branch of branches) for (const t of scalarTypes(branch)) out.add(t);
+    }
+    return out;
+  };
+
+  // The properties that a branch defines, also through a reference or an `allOf`.
+  const propertiesOf = (start: Json | undefined, seen = new Set<Json>()): Map<string, Json> => {
+    const node = followRef(start);
+    const out = new Map<string, Json>();
+    if (!isObject(node) || seen.has(node)) return out;
+    seen.add(node);
+    if (isObject(node.properties)) for (const [key, value] of Object.entries(node.properties)) out.set(key, value);
+    if (Array.isArray(node.allOf)) {
+      for (const branch of node.allOf) for (const [key, value] of propertiesOf(branch, seen)) out.set(key, value);
+    }
+    return out;
+  };
+
+  const walk = (node: Json | undefined, pointer: string): void => {
+    if (Array.isArray(node)) return node.forEach((child, i) => walk(child, childPointer(pointer, i)));
+    if (!isObject(node)) return;
+    if (Array.isArray(node.type) && node.type.length > 1) {
+      problems.push(`${pointer}: a type keyword names more than one type: ${JSON.stringify(node.type)}`);
+    }
+    for (const keyword of ["anyOf", "oneOf"]) {
+      const branches = node[keyword];
+      if (!Array.isArray(branches)) continue;
+      const types = new Set<string>();
+      for (const branch of branches) for (const t of scalarTypes(branch)) types.add(t);
+      if (types.has("string") && types.size > 1) {
+        problems.push(`${childPointer(pointer, keyword)}: the union permits a string and another scalar type: ${[...types].join(", ")}`);
+      }
+      const defined = new Map<string, Json>();
+      const reported = new Set<string>();
+      for (const branch of branches) {
+        for (const [key, value] of propertiesOf(branch)) {
+          const first = defined.get(key);
+          if (first === undefined) defined.set(key, value);
+          else if (!isDeepStrictEqual(first, value) && !reported.has(key)) {
+            reported.add(key);
+            problems.push(`${childPointer(pointer, keyword)}: the branches define the property ${key} with different schemas`);
+          }
+        }
+      }
+    }
+    for (const [key, child] of Object.entries(node)) walk(child, childPointer(pointer, key));
+  };
+  walk(schema, "#");
+  return problems;
 }
 
 export interface GenerateResult {
@@ -245,6 +329,8 @@ export function generate(schema: Json, manifest: Manifest): GenerateResult {
   for (const [elementType, names] of byElementType) {
     if (names.length > 1) problems.push(`the types ${names.join(" and ")} have the same element-type name ${elementType}`);
   }
+
+  problems.push(...yamlTypingProblems(schema));
 
   const failed = () => ({ output: "", elementTypes: "", gaps: [...gaps].sort(), problems, orphans });
   if (gaps.size || problems.length) return failed();

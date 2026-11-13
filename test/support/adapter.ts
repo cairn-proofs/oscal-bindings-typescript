@@ -18,8 +18,9 @@ import {
   parsePlanOfActionAndMilestones,
   parseProfile,
   parseSystemSecurityPlan,
+  parseYaml,
 } from "../../src/parse.ts";
-import { serialize } from "../../src/serialize.ts";
+import { serialize, serializeYaml } from "../../src/serialize.ts";
 import { supportedElementTypes, validateElement } from "../../src/validate-element.ts";
 
 /** The typed parser of each root key. */
@@ -90,8 +91,8 @@ export const adapter: Adapter = {
   validateElement: (elementType, value) => validateElement(elementType, value).valid,
   elementTypes: supportedElementTypes,
   assessmentPeriod: () => notImplemented("assessmentPeriod"),
-  parseYaml: () => notImplemented("parseYaml"),
-  serializeYaml: () => notImplemented("serializeYaml"),
+  parseYaml,
+  serializeYaml: (document) => serializeYaml(document as OscalDocument),
   category: (error) => {
     if (error instanceof OscalError) return error.category;
     throw error;
