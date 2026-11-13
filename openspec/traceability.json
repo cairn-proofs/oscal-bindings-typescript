@@ -17,7 +17,9 @@
         "PRS-013",
         "ERR-001",
         "ERR-003",
-        "ERR-004"
+        "ERR-004",
+        "ERR-009",
+        "ERR-010"
       ]
     },
     {
@@ -41,56 +43,64 @@
       "name": "parseCatalog",
       "requirements": [
         "PRS-003",
-        "ERR-005"
+        "ERR-005",
+        "ERR-009"
       ]
     },
     {
       "name": "parseMappingCollection",
       "requirements": [
         "PRS-003",
-        "ERR-005"
+        "ERR-005",
+        "ERR-009"
       ]
     },
     {
       "name": "parseProfile",
       "requirements": [
         "PRS-003",
-        "ERR-005"
+        "ERR-005",
+        "ERR-009"
       ]
     },
     {
       "name": "parseComponentDefinition",
       "requirements": [
         "PRS-003",
-        "ERR-005"
+        "ERR-005",
+        "ERR-009"
       ]
     },
     {
       "name": "parseSystemSecurityPlan",
       "requirements": [
         "PRS-003",
-        "ERR-005"
+        "ERR-005",
+        "ERR-009"
       ]
     },
     {
       "name": "parseAssessmentPlan",
       "requirements": [
         "PRS-003",
-        "ERR-005"
+        "ERR-005",
+        "ERR-009"
       ]
     },
     {
       "name": "parseAssessmentResults",
       "requirements": [
         "PRS-003",
-        "ERR-005"
+        "ERR-005",
+        "ERR-009"
       ]
     },
     {
       "name": "parsePlanOfActionAndMilestones",
       "requirements": [
         "PRS-003",
-        "ERR-005"
+        "ERR-005",
+        "ERR-009"
       ]
     },
     {
@@ -104,7 +114,10 @@
       "requirements": [
         "ELV-001",
         "ELV-003",
+        "ELV-004",
         "ERR-008",
+        "ERR-010",
+        "ERR-011",
         "PRS-007",
         "PRS-009"
       ]

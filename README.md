@@ -33,8 +33,12 @@ What exists:
   resource. `buildHash` uses SHA-256 when the caller omits the algorithm. `buildResource` generates a UUID when the
   caller omits `uuid`. Each builder validates its result, and an omitted optional input is absent from the result. An
   invalid input gives a `ParseError` that carries one entry for each failing location.
-- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `NotFoundError`, and
-  `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing location.
+- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `LimitExceededError`, `NotFoundError`, and
+  `UnknownElementTypeError`. A `ParseError` of a schema failure carries one entry for each failing location. Use
+  `instanceof` to test the category of an error. A `DocumentTypeMismatchError` is also a `ParseError`, but a
+  `ParseError` is not a `DocumentTypeMismatchError`. The `category` property holds the most specific category. The
+  `limit` property identifies the limit that stopped an operation, for example `nesting-depth`. Test it with
+  `error.limit !== undefined`, because each error has the `limit` key.
 - A conformance runner. It runs each of the 58 cases of `corpus/1.2.3/cases.json` as one test, with the case id as the
   test name. The cases of parsing, the `round-trip` cases, and the `element/*` cases pass. `test/conformance/expected-failures.json` lists
   each case that needs an operation that does not exist yet. A listed case that passes fails the run, and so does a
@@ -60,11 +64,15 @@ limit has these properties:
    or an array.
 2. The limit applies to `parse`, `parseFile`, the typed parsers, `isValid`, `validateElement`, `buildHash`,
    `buildRlink`, and `buildResource`.
-3. A deeper input or value gives a `ParseError` that names the limit. `isValid` returns false for it.
-4. A caller cannot change the limit.
+3. A deeper input gives a `ParseError` from `parse`, `parseFile`, and the typed parsers. A deeper value gives a
+   `LimitExceededError` from `validateElement`, `buildHash`, `buildRlink`, and `buildResource`. Each error has the limit
+   `nesting-depth` in its `limit` property. `isValid` returns false for a deeper input.
+4. A `LimitExceededError` is not a `ParseError`. A caller that catches `ParseError` around `validateElement` or a
+   builder does not catch it.
+5. A caller cannot change the limit.
 
 The schema checks recurse once for each level. A deeper input or value can make them throw a `RangeError`, so the
-binding stops it first. A valid element that is deeper than 250 levels gives a `ParseError`, not a valid result.
+binding stops it first. A valid element that is deeper than 250 levels gives a `LimitExceededError`, not a valid result.
 
 A `ParseError` has no limit on its entries. It carries one entry for each failing location.
 

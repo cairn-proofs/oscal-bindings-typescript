@@ -9,7 +9,7 @@ import { Ajv, type ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 import { type ElementType, elementTypes } from "./generated/element-types.ts";
 import schema from "./generated/oscal-complete-schema.json" with { type: "json" };
-import { type FailureEntry, ParseError } from "./errors.ts";
+import type { FailureEntry } from "./errors.ts";
 
 export { type ElementType, elementTypes };
 
@@ -142,7 +142,7 @@ const childrenOf = (node: object): unknown[] => (Array.isArray(node) ? node : Ob
  * Whether the nesting depth of a JSON value is over the limit. The walk keeps one cursor for each open object or array,
  * so it does not recurse, and its stack grows only with the depth.
  */
-function exceedsDepthLimit(root: unknown): boolean {
+export function exceedsDepthLimit(root: unknown): boolean {
   if (root === null || typeof root !== "object") return false;
   const stack = [{ values: childrenOf(root), next: 0 }];
   while (stack.length > 0) {
@@ -160,12 +160,8 @@ function exceedsDepthLimit(root: unknown): boolean {
   return false;
 }
 
-/** Throws a `ParseError` that names the limit when the nesting depth of the value is over it (design D3). */
-export function assertWithinDepthLimit(value: unknown): void {
-  if (exceedsDepthLimit(value)) {
-    throw new ParseError(`the nesting depth of the input is over the limit of ${MAX_NESTING_DEPTH} levels`);
-  }
-}
+/** The message of the error that each operation throws when the nesting depth is over the limit. */
+export const depthLimitMessage = `the nesting depth of the input is over the limit of ${MAX_NESTING_DEPTH} levels`;
 
 const escapeSegment = (segment: string) => segment.replaceAll("~", "~0").replaceAll("/", "~1");
 

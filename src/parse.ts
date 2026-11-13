@@ -15,7 +15,7 @@ import type {
   ProfileDocument,
   SystemSecurityPlanDocument,
 } from "./generated/oscal.ts";
-import { assertWithinDepthLimit, collect, documentValidators, rootKeys } from "./validators.ts";
+import { collect, depthLimitMessage, documentValidators, exceedsDepthLimit, rootKeys } from "./validators.ts";
 
 type Input = string | Uint8Array;
 
@@ -60,7 +60,7 @@ function rootKeyOf(value: unknown, expected?: string): string {
 /** Stages 1 to 4. Returns the parsed value and its root key. */
 function read(input: Input, expected?: string): { value: unknown; rootKey: string } {
   const value = decodeJson(input);
-  assertWithinDepthLimit(value);
+  if (exceedsDepthLimit(value)) throw new ParseError(depthLimitMessage, [], { limit: "nesting-depth" });
   return { value, rootKey: rootKeyOf(value, expected) };
 }
 

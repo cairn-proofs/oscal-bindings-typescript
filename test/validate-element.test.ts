@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { OscalError, ParseError, UnknownElementTypeError } from "../src/errors.ts";
+import { LimitExceededError, OscalError, ParseError, UnknownElementTypeError } from "../src/errors.ts";
 import { supportedElementTypes, validateElement } from "../src/validate-element.ts";
 
 test("supportedElementTypes returns a sorted list of kebab-case names that holds back-matter (ELV-002)", () => {
@@ -35,20 +35,30 @@ test("an unknown element type throws an UnknownElementTypeError that names the t
   );
 });
 
-test("a value deeper than 250 levels throws a ParseError that names the limit", () => {
+test("ERR-011.01 a value deeper than 250 levels is a limit-exceeded error that names the limit", () => {
   let deep: unknown = {};
   for (let i = 0; i < 300; i++) deep = [deep];
   assert.throws(
     () => validateElement("observation", deep),
-    (e) => e instanceof ParseError && e.failures.length === 0 && /limit of 250/.test(e.message),
+    (e) =>
+      e instanceof LimitExceededError &&
+      e.category === "limit-exceeded" &&
+      e.limit === "nesting-depth" &&
+      /limit of 250/.test(e.message),
   );
-});
-
-test("a value that refers to itself throws the same ParseError", () => {
   const loop: Record<string, unknown> = {};
   loop.self = loop;
   assert.throws(
     () => validateElement("observation", loop),
-    (e) => e instanceof ParseError && /limit of 250/.test(e.message),
+    (e) => e instanceof LimitExceededError && e.limit === "nesting-depth",
+  );
+});
+
+test("ERR-011.02 the limit-exceeded error is not a parse error", () => {
+  let deep: unknown = {};
+  for (let i = 0; i < 300; i++) deep = [deep];
+  assert.throws(
+    () => validateElement("observation", deep),
+    (e) => e instanceof OscalError && !(e instanceof ParseError),
   );
 });

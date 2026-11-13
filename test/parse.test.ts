@@ -75,18 +75,28 @@ function nestedPlan(levels: number): string {
 /** `levels` nested arrays inside a catalog-less object. The value is not a document, and the walk stops first. */
 const deepArrays = (levels: number) => `{"catalog":${"[".repeat(levels)}${"]".repeat(levels)}}`;
 
-test("nested tasks at the nesting depth limit parse, and one level more is a parse error that names the limit", () => {
+test("ERR-004.03 nested tasks at the nesting depth limit parse, and one level more is a parse error with the limit", () => {
   assert.doesNotThrow(() => parse(nestedPlan(124)));
   assert.equal(isValid(nestedPlan(124)), true);
-  assert.throws(() => parse(nestedPlan(125)), (e) => e instanceof ParseError && /limit of 250/.test(e.message));
+  assert.throws(
+    () => parse(nestedPlan(125)),
+    (e) => e instanceof ParseError && e.category === "parse-error" && e.limit === "nesting-depth" && /limit of 250/.test(e.message),
+  );
   assert.equal(isValid(nestedPlan(125)), false);
 });
 
 test("a depth of 5000 is a parse error, not a RangeError", () => {
   for (const input of [nestedPlan(2500), deepArrays(5000)]) {
-    assert.throws(() => parse(input), (e) => e instanceof ParseError && e.failures.length === 0);
+    assert.throws(() => parse(input), (e) => e instanceof ParseError && e.failures.length === 0 && e.limit === "nesting-depth");
     assert.equal(isValid(input), false);
   }
+});
+
+test("ERR-010.02 a document that fails schema validation is a parse error whose limit is undefined", () => {
+  assert.throws(
+    () => parseProfile(JSON.stringify({ profile: { not: "a profile" } })),
+    (e) => e instanceof ParseError && e.failures.length > 0 && e.limit === undefined && "limit" in e,
+  );
 });
 
 test("an input with two root keys is a parse error with one entry at the root pointer", () => {
@@ -106,13 +116,20 @@ test("an input with no root key is a parse error that says the input names no OS
   }
 });
 
-test("parseCatalog on a profile with an invalid body is a document type mismatch", () => {
+test("ERR-009.01 parseCatalog on a profile with an invalid body is a document type mismatch", () => {
   const input = JSON.stringify({ profile: { not: "a profile" } });
   assert.throws(
     () => parseCatalog(input),
     (e) => e instanceof DocumentTypeMismatchError && e instanceof ParseError && e.category === "document-type-mismatch",
   );
   assert.throws(() => parseProfile(input), (e) => e instanceof ParseError && e.category === "parse-error" && e.failures.length > 0);
+});
+
+test("ERR-009.02 input that is not valid JSON is a parse error that is not a document type mismatch", () => {
+  assert.throws(
+    () => parseCatalog("{"),
+    (e) => e instanceof ParseError && !(e instanceof DocumentTypeMismatchError) && e.category === "parse-error",
+  );
 });
 
 test("isValid returns false and does not throw for each invalid corpus input", () => {
