@@ -28,7 +28,6 @@
   "assessment-period/mixed-offsets": "not implemented (#19)",
   "assessment-period/equal-instant": "not implemented (#19)",
   "assessment-period/seventh-fraction-digit": "not implemented (#19)",
-  "element-types/all": "not implemented (#27)",
   "facade/catalog": "not implemented (#31)",
   "facade/profile": "not implemented (#31)",
   "facade/component-definition": "not implemented (#31)",
