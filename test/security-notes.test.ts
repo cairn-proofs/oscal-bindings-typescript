@@ -10,7 +10,7 @@ import path from "node:path";
 import { test } from "node:test";
 import * as backmatter from "../src/backmatter.ts";
 import * as documentModule from "../src/document.ts";
-import { NotFoundError, ParseError, ReadError } from "../src/errors.ts";
+import { BuilderError, NotFoundError, ParseError, ReadError } from "../src/errors.ts";
 import type { OscalDocument } from "../src/generated/oscal.ts";
 import * as parseModule from "../src/parse.ts";
 import { serialize, serializeYaml } from "../src/serialize.ts";
@@ -262,7 +262,7 @@ test('security note "Check what you build or change": serializeYaml does not che
 });
 
 test('security note "Check what you build or change": the back-matter builders check their result', () => {
-  assert.throws(() => buildHash("abc", " SHA-256"), ParseError, stale("Check what you build or change"));
+  assert.throws(() => buildHash("abc", " SHA-256"), BuilderError, stale("Check what you build or change"));
 });
 
 test('security note "Isolation and shared documents": a parsed document is not frozen and a change goes unseen', () => {

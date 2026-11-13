@@ -216,19 +216,23 @@
     {
       "name": "buildHash",
       "requirements": [
-        "BMB-001"
+        "BMB-001",
+        "ERR-013"
       ]
     },
     {
       "name": "buildRlink",
       "requirements": [
-        "BMB-002"
+        "BMB-002",
+        "ERR-013"
       ]
     },
     {
       "name": "buildResource",
       "requirements": [
-        "BMB-003"
+        "BMB-003",
+        "BMB-004",
+        "ERR-013"
       ]
     }
   ]

@@ -20,6 +20,9 @@ export interface Case {
   "expected-valid"?: boolean;
   "expected-min-failures"?: number;
   "expected-max-failures"?: number;
+  arguments?: Record<string, unknown>;
+  "expected-uuid"?: string;
+  "expected-element"?: unknown;
 }
 
 export interface Corpus {
@@ -71,15 +74,25 @@ function checkFailureCount(adapter: Adapter, c: Case, error: unknown): void {
 /**
  * The operations of the corpus that runCase has no rules for yet. The change that adds the rules of an operation
  * removes it from this list. Until then, each case of the operation is in expected-failures.json, because runCase
- * rejects an operation that it does not know. Operations: facade (#31), build-hash (#31), build-rlink (#31),
- * build-resource (#30, #31).
+ * rejects an operation that it does not know. Operations: facade (#31), build-hash (#31), build-rlink (#31).
  */
-export const PENDING_OPERATIONS: ReadonlySet<string> = new Set([
-  "facade",
-  "build-hash",
-  "build-rlink",
-  "build-resource",
-]);
+export const PENDING_OPERATIONS: ReadonlySet<string> = new Set(["facade", "build-hash", "build-rlink"]);
+
+/**
+ * The field of a `build-resource` case that runCase has no rule for yet (#31), or `undefined` when runCase has a rule
+ * for each field of the case.
+ */
+function pendingField(c: Case): string | undefined {
+  if (c.operation !== "build-resource") return undefined;
+  if (c["expected-element"] !== undefined) return "expected-element";
+  if (c.arguments?.["document-ids"] !== undefined) return "document-ids";
+  return undefined;
+}
+
+/** True when runCase rejects the case: its operation is pending, or it has a field that has no rule yet. */
+export function isPendingCase(c: Case): boolean {
+  return PENDING_OPERATIONS.has(c.operation) || pendingField(c) !== undefined;
+}
 
 /** Runs one corpus case through the adapter. Throws when the binding does not give the expected result. */
 export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
@@ -130,6 +143,18 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
     case "element-types": {
       const names: unknown = JSON.parse(fs.readFileSync(path.join(corpusDir, c.expected as string), "utf8"));
       assert.deepEqual(adapter.elementTypes(), names, `${c.id}: the element types differ from ${c.expected}`);
+      return;
+    }
+    case "build-resource": {
+      const field = pendingField(c);
+      if (field !== undefined) assert.fail(`${c.id}: pending: ${field} (#31)`);
+      const args = (c.arguments ?? {}) as { key?: string; title?: string; identifier?: string };
+      if (category !== undefined) {
+        reports(adapter, c, category, () => adapter.buildResource(args));
+        return;
+      }
+      const resource = adapter.buildResource(args) as { uuid?: unknown };
+      assert.equal(resource.uuid, c["expected-uuid"], `${c.id}: wrong uuid`);
       return;
     }
     case "yaml-round-trip": {

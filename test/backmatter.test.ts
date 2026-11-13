@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildHash, buildResource, buildRlink } from "../src/backmatter.ts";
-import { LimitExceededError, ParseError } from "../src/errors.ts";
+import { BuilderError, LimitExceededError, OscalError, ParseError } from "../src/errors.ts";
 
 const uuidPattern = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[45][0-9A-Fa-f]{3}-[89ABab][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}$/;
 
@@ -17,12 +17,26 @@ test("BMB-001.03 buildHash rejects an algorithm that is not a valid string and a
   assert.throws(
     () => buildHash("abc", " SHA-256"),
     (error: unknown) => {
-      assert.ok(error instanceof ParseError);
+      assert.ok(error instanceof BuilderError);
       assert.ok(error.failures.some((failure) => failure.location === "/algorithm"));
       return true;
     },
   );
   assert.equal(buildHash("abc", "SHA-999").algorithm, "SHA-999");
+});
+
+test("ERR-013.01 invalid input to a builder is an error of the builder-error category", () => {
+  assert.throws(
+    () => buildHash("abc", " SHA-256"),
+    (error: unknown) => error instanceof OscalError && error.category === "builder-error",
+  );
+});
+
+test("ERR-013.02 a builder error is not a parse error", () => {
+  assert.throws(
+    () => buildResource({ key: "k", uuid: "11111111-1111-4111-8111-111111111111" }),
+    (error: unknown) => error instanceof BuilderError && !(error instanceof ParseError),
+  );
 });
 
 test("BMB-002.01 buildRlink with only a reference has no media-type and no hashes key", () => {
@@ -60,11 +74,11 @@ test("BMB-003.02 buildResource leaves out an omitted input and keeps a given uui
 test("BMB-003.03 buildResource rejects an invalid or empty document-ids list", () => {
   assert.throws(
     () => buildResource({ "document-ids": [{} as { identifier: string }] }),
-    (error: unknown) => error instanceof ParseError && error.failures.length > 0,
+    (error: unknown) => error instanceof BuilderError && error.failures.length > 0,
   );
   assert.throws(
     () => buildResource({ "document-ids": [] }),
-    (error: unknown) => error instanceof ParseError && error.failures.length > 0,
+    (error: unknown) => error instanceof BuilderError && error.failures.length > 0,
   );
 });
 
