@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-11-13
+# The contract is in the oscal-bindings-specs store (document-parsing, naming-manifest, error-model). This change
+# consumes it and adds no requirement of its own.
+skip_specs: true

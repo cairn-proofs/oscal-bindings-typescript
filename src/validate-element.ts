@@ -3,7 +3,14 @@
  * its first failure, so the binding does no schema work on input that an earlier stage already rejects.
  */
 import { type FailureEntry, LimitExceededError, UnknownElementTypeError } from "./errors.ts";
-import { collect, depthLimitMessage, elementTypes, elementValidators, exceedsDepthLimit } from "./validators.ts";
+import {
+  collect,
+  depthLimitMessage,
+  elementTypes,
+  elementValidators,
+  exceedsDepthLimit,
+  passes,
+} from "./validators.ts";
 
 /** The result of `validateElement`. */
 export interface ElementValidationResult {
@@ -24,7 +31,7 @@ export function validateElement(elementType: string, value: unknown): ElementVal
   const validators = elementValidators(elementType);
   if (validators === undefined) throw new UnknownElementTypeError(elementType);
   if (exceedsDepthLimit(value)) throw new LimitExceededError("nesting-depth", depthLimitMessage);
-  if (validators.failFast(value)) return { valid: true, failures: [] };
+  if (passes(validators.failFast, value)) return { valid: true, failures: [] };
   return { valid: false, failures: collect(validators.full, value) };
 }
 

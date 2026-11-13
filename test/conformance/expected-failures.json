@@ -23,8 +23,6 @@
   "yaml-parse/boolean-form": "not implemented",
   "yaml-parse/number-form": "not implemented",
   "yaml-parse/plus-sign": "not implemented",
-  "parse/closed-enum-out-of-set": "not implemented (#37)",
-  "parse-file/directory": "not implemented (#29)",
   "assessment-period/mixed-offsets": "not implemented (#19)",
   "assessment-period/equal-instant": "not implemented (#19)",
   "assessment-period/seventh-fraction-digit": "not implemented (#19)",

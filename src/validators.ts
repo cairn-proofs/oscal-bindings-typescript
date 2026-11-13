@@ -5,9 +5,9 @@
  * of the schema node that defines the type. The generator writes both inputs into `src/generated/`, so this module reads
  * only files of the repo.
  */
-import { Ajv, type ValidateFunction } from "ajv";
+import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
-import { type ElementType, elementTypes } from "./generated/element-types.ts";
+import { type ElementType, elementTypes, type UnionSite, unionSites } from "./generated/element-types.ts";
 import schema from "./generated/oscal-complete-schema.json" with { type: "json" };
 import type { FailureEntry } from "./errors.ts";
 
@@ -56,12 +56,13 @@ regExpEngine.code = "regExpEngine";
 
 /**
  * One factory sets the options of both Ajv instances, so the options cannot differ by mistake. Only `allErrors`
- * differs (design D3). `strictTypes` is off, because the schema sets a `pattern` on a number (DecimalDatatype), and the
- * default value makes Ajv write a warning to the console. The default `unicodeRegExp` passes the `u` flag to the
- * pattern engine, so `\p{L}` and `\p{N}` keep their XSD meaning (PRS-007).
+ * differs (design D3). `verbose` adds `parentSchema` and `data` to each error, so a parse error can find the nested
+ * union site of an error and the object at the site (PRS-014). `strictTypes` is off, because the schema sets a
+ * `pattern` on a number (DecimalDatatype), and the default value makes Ajv write a warning to the console. The default
+ * `unicodeRegExp` passes the `u` flag to the pattern engine, so `\p{L}` and `\p{N}` keep their XSD meaning (PRS-007).
  */
 function createAjv(allErrors: boolean): Ajv {
-  const ajv = new Ajv({ allErrors, strictTypes: false, code: { regExp: regExpEngine } });
+  const ajv = new Ajv({ allErrors, verbose: true, strictTypes: false, code: { regExp: regExpEngine } });
   // ajv-formats is CommonJS, so under NodeNext the callable is the `default` property of the default import.
   addFormats.default(ajv, ["date-time", "uri", "uri-reference", "email"]);
   ajv.addSchema(schema);
@@ -73,6 +74,27 @@ const ajv = createAjv(true);
 const failFastAjv = createAjv(false);
 
 const pointers = new Map(elementTypes.map((row) => [row.typeName, row.pointer]));
+
+/** The schema node at a JSON pointer of the imported schema. Throws when there is no node. */
+function nodeAt(pointer: string): unknown {
+  let node: unknown = schema;
+  for (const segment of pointer.split("/").slice(1)) {
+    const key = segment.replaceAll("~1", "/").replaceAll("~0", "~");
+    if (node === null || typeof node !== "object" || !Object.hasOwn(node, key)) {
+      throw new Error(`no schema node at ${pointer}`);
+    }
+    node = (node as Record<string, unknown>)[key];
+  }
+  return node;
+}
+
+/**
+ * The variants of each nested union site, by the site node of the imported schema. The `parentSchema` of the `anyOf`
+ * error of a site is the site node, so the map finds the site of an error by identity.
+ */
+const siteVariants = new Map<unknown, UnionSite["variants"]>(
+  unionSites.map((site) => [nodeAt(site.pointer), site.variants]),
+);
 const elementPointers = new Map(elementTypes.map((row) => [row.elementType, row.pointer]));
 
 /**
@@ -163,16 +185,30 @@ export function exceedsDepthLimit(root: unknown): boolean {
 /** The message of the error that each operation throws when the nesting depth is over the limit. */
 export const depthLimitMessage = `the nesting depth of the input is over the limit of ${MAX_NESTING_DEPTH} levels`;
 
+/**
+ * Runs a validate function on a value, and returns the result. The function then holds no errors, because a verbose
+ * error can hold the whole input.
+ */
+export function passes(validate: ValidateFunction, value: unknown): boolean {
+  const valid = validate(value) === true;
+  validate.errors = null;
+  return valid;
+}
+
+/** Runs a validate function on a value, and returns its errors. The function then holds no errors. */
+function errorsOf(validate: ValidateFunction, value: unknown): ErrorObject[] {
+  validate(value);
+  const errors = validate.errors ?? [];
+  validate.errors = null;
+  return errors;
+}
+
 const escapeSegment = (segment: string) => segment.replaceAll("~", "~0").replaceAll("/", "~1");
 
-/**
- * One entry for each failing location (design D6). Runs the collecting validate function on the value, and reads its
- * errors.
- */
-export function collect(full: ValidateFunction, value: unknown): FailureEntry[] {
-  full(value);
+/** One entry for each failing location (design D6). This function is the only owner of the location rules. */
+function toEntries(errors: readonly ErrorObject[]): FailureEntry[] {
   const byLocation = new Map<string, string[]>();
-  for (const error of full.errors ?? []) {
+  for (const error of errors) {
     let location = error.instancePath;
     if (error.keyword === "required") location += `/${escapeSegment(error.params.missingProperty)}`;
     if (error.keyword === "additionalProperties") location += `/${escapeSegment(error.params.additionalProperty)}`;
@@ -181,4 +217,57 @@ export function collect(full: ValidateFunction, value: unknown): FailureEntry[] 
     else messages.push(error.message ?? error.keyword);
   }
   return [...byLocation].map(([location, messages]) => ({ location, messages }));
+}
+
+/** One entry for each failing location of each error of the collecting validate function. */
+export function collect(full: ValidateFunction, value: unknown): FailureEntry[] {
+  return toEntries(errorsOf(full, value));
+}
+
+/** The selection that owns a location: the shortest prefix of the location that the map holds, at a segment boundary. */
+function ownerOf(location: string, selections: ReadonlyMap<string, unknown>): string | undefined {
+  for (let i = 0; i <= location.length; i++) {
+    if (i < location.length && location[i] !== "/") continue;
+    const prefix = location.slice(0, i);
+    if (selections.has(prefix)) return prefix;
+  }
+  return undefined;
+}
+
+/**
+ * The errors of a value, with only the errors of the selected branch for an object that selects a nested-union branch
+ * (PRS-014). An object selects a branch when it holds the distinguishing property of exactly one variant (NAM-020).
+ */
+function selectedErrors(full: ValidateFunction, value: unknown): ErrorObject[] {
+  const errors = errorsOf(full, value);
+  const selections = new Map<string, { typeName: string; data: object }>();
+  for (const error of errors) {
+    if (error.keyword !== "anyOf") continue;
+    const variants = siteVariants.get(error.parentSchema);
+    const data: unknown = error.data;
+    if (variants === undefined || data === null || typeof data !== "object" || Array.isArray(data)) continue;
+    const held = variants.filter((variant) => Object.hasOwn(data, variant.property));
+    if (held.length === 1) selections.set(error.instancePath, { typeName: held[0].typeName, data });
+  }
+  if (selections.size === 0) return errors;
+  const result: ErrorObject[] = [];
+  const done = new Set<string>();
+  for (const error of errors) {
+    const owner = ownerOf(error.instancePath, selections);
+    if (owner === undefined) {
+      result.push(error);
+    } else if (!done.has(owner)) {
+      done.add(owner);
+      const { typeName, data } = selections.get(owner)!;
+      for (const inner of selectedErrors(validatorFor(typeName), data)) {
+        result.push({ ...inner, instancePath: owner + inner.instancePath });
+      }
+    }
+  }
+  return result;
+}
+
+/** One entry for each failing location of a parse error, with the failures of the selected branches only (PRS-014). */
+export function collectSelected(full: ValidateFunction, value: unknown): FailureEntry[] {
+  return toEntries(selectedErrors(full, value));
 }
