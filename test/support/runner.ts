@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import type { Adapter } from "./adapter.ts";
-import { canonicalize } from "./canonical-json.ts";
+import { canonicalize, normalizeDatetime } from "./canonical-json.ts";
 
 export interface Case {
   id: string;
@@ -21,6 +21,7 @@ export interface Case {
   "expected-min-failures"?: number;
   "expected-max-failures"?: number;
   arguments?: Record<string, unknown>;
+  "expected-period"?: { start: string; end: string };
   "expected-uuid"?: string;
   "expected-element"?: unknown;
 }
@@ -136,7 +137,17 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
     }
     case "assessment-period": {
       const document = adapter.parse(inputOf(corpusDir, c));
-      reports(adapter, c, category, () => adapter.assessmentPeriod(document));
+      const expected = c["expected-period"];
+      if (expected === undefined) {
+        reports(adapter, c, category, () => adapter.assessmentPeriod(document));
+        return;
+      }
+      const period = adapter.assessmentPeriod(document);
+      for (const bound of ["start", "end"] as const) {
+        const value = period[bound];
+        assert.equal(typeof value, "string", `${c.id}: the ${bound} of the period is not a string`);
+        assert.equal(normalizeDatetime(value as string), expected[bound], `${c.id}: wrong ${bound}`);
+      }
       return;
     }
     case "validate-element": {

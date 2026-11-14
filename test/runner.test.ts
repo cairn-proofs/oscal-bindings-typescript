@@ -49,7 +49,7 @@ function conforming(c: Case): Adapter {
     isValid: () => c.operation !== "parse",
     validateElement: () => (throwing ? fail() : (c["expected-valid"] as boolean)),
     elementTypes: () => JSON.parse(expectedJson()) as string[],
-    assessmentPeriod: fail,
+    assessmentPeriod: () => (throwing ? fail() : (c["expected-period"] as { start: string; end: string })),
     parseYaml: () => (c.operation === "yaml-parse" ? fail() : {}),
     serializeYaml: () => "",
     facade: view,
@@ -125,8 +125,23 @@ const changes: Array<[string, Case, (a: Adapter, c: Case) => Partial<Adapter>]> 
     }),
   ],
   ["parse-file: wrong category", firstOf("parse-file"), () => ({ category: () => "other" })],
-  ["assessment-period: no error", firstOf("assessment-period"), () => ({ assessmentPeriod: () => ({}) })],
+  ["assessment-period: no error", firstOf("assessment-period"), () => ({ assessmentPeriod: () => ({ start: undefined, end: undefined }) })],
   ["assessment-period: wrong category", firstOf("assessment-period"), () => ({ category: () => "other" })],
+  [
+    "assessment-period: wrong start",
+    byId("assessment-period/mixed-offsets"),
+    () => ({ assessmentPeriod: () => ({ start: "2026-03-01T23:00:00-05:00", end: "2026-03-01T23:00:00-05:00" }) }),
+  ],
+  [
+    "assessment-period: wrong end",
+    byId("assessment-period/mixed-offsets"),
+    () => ({ assessmentPeriod: () => ({ start: "2026-03-02T01:00:00Z", end: "2026-03-02T01:00:00Z" }) }),
+  ],
+  [
+    "assessment-period: no start",
+    byId("assessment-period/mixed-offsets"),
+    () => ({ assessmentPeriod: () => ({ start: undefined, end: "2026-03-01T23:00:00-05:00" }) }),
+  ],
   [
     "validate-element: wrong validity",
     firstOf("validate-element", (c) => c["expected-valid"] !== undefined),
@@ -285,6 +300,13 @@ for (const [name, c, change] of changes) {
     assert.throws(() => runCase(changed, corpus.dir, c));
   });
 }
+
+test("the runner normalizes a bound of an assessment period before it compares the bound", () => {
+  const c = byId("assessment-period/mixed-offsets");
+  const base = conforming(c);
+  const start = "2026-03-02T01:00:00+00:00";
+  runCase({ ...base, assessmentPeriod: () => ({ ...(c["expected-period"] as { start: string; end: string }), start }) }, corpus.dir, c);
+});
 
 test("a case of the corpus has the bytes input form that the runner passes as bytes", () => {
   const c = corpus.cases.find((x) => x["input-form"] === "bytes") as Case;

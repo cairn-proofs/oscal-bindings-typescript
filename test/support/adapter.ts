@@ -87,7 +87,7 @@ export interface Adapter {
   /** ELV-002: the list of supported element-type names. */
   elementTypes(): readonly string[];
   /** FAC-004: the assessment period accessor on the facade of a parsed document. */
-  assessmentPeriod(document: unknown): unknown;
+  assessmentPeriod(document: unknown): { start: string | undefined; end: string | undefined };
   /** YML-005: the parse of YAML text or bytes. */
   parseYaml(input: string | Uint8Array): unknown;
   /** YML-008: the serialization to YAML. */
@@ -122,7 +122,7 @@ export const adapter: Adapter = {
   isValid,
   validateElement: (elementType, value) => validateElement(elementType, value).valid,
   elementTypes: supportedElementTypes,
-  assessmentPeriod: () => notImplemented("assessmentPeriod"),
+  assessmentPeriod: (document) => new OscalDoc(document as OscalDocument).assessmentPeriod(),
   parseYaml,
   serializeYaml: (document) => serializeYaml(document as OscalDocument),
   facade: (document) => viewOf(new OscalDoc(document as OscalDocument)),

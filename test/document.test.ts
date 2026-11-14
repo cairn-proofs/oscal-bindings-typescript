@@ -87,3 +87,30 @@ test("fromJson passes through the error of parse", () => {
   assert.throws(() => OscalDoc.fromJson("{"), ParseError);
   assert.throws(() => OscalDoc.fromJson("{}"), ParseError);
 });
+
+/** A wrapper of an Assessment Plan with the given tasks. */
+const planWith = (tasks: unknown[]) =>
+  new OscalDoc({ "assessment-plan": { uuid: "u", metadata: {}, tasks } } as unknown as OscalDocument);
+
+test("the assessment period of a plan aggregates the timing of the tasks and the nested tasks (FAC-005.01)", () => {
+  const doc = planWith([
+    {
+      timing: { "on-date": { date: "2026-03-05T00:00:00Z" } },
+      tasks: [{ timing: { "within-date-range": { start: "2026-03-01T00:00:00Z", end: "2026-03-10T00:00:00Z" } } }],
+    },
+    { timing: { "within-date-range": { start: "2026-03-02T00:00:00Z", end: "2026-03-20T00:00:00Z" } } },
+  ]);
+  assert.deepEqual(doc.assessmentPeriod(), { start: "2026-03-01T00:00:00Z", end: "2026-03-20T00:00:00Z" });
+});
+
+test("the assessment period of a plan with no calendar date has no bound (FAC-005.02)", () => {
+  const timing = { "at-frequency": { period: 1, unit: "days" } };
+  const period = planWith([{ timing }, { timing }]).assessmentPeriod();
+  assert.deepEqual(period, { start: undefined, end: undefined });
+  assert.ok("start" in period && "end" in period);
+});
+
+test("an on-date is both the start and the end of the assessment period (FAC-005.03)", () => {
+  const doc = planWith([{ timing: { "on-date": { date: "2026-03-05T00:00:00Z" } } }]);
+  assert.deepEqual(doc.assessmentPeriod(), { start: "2026-03-05T00:00:00Z", end: "2026-03-05T00:00:00Z" });
+});

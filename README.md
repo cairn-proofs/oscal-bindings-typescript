@@ -34,7 +34,8 @@ What exists:
 - The document facade. `OscalDoc` wraps a document of any of the eight types. It gives the wrapper, the body, the
   metadata, the OSCAL version, and the body UUID through one shape. `OscalDoc.fromJson` builds it from text or bytes,
   and `OscalDoc.fromFile` builds it from a file path. The constructor throws a `TypeError` for a value that is not a
-  document wrapper.
+  document wrapper. `assessmentPeriod()` returns the start and the end of an Assessment Plan or Assessment Results
+  document, and throws an `AccessError` for each other type.
 - Back-matter builders. `buildHash`, `buildRlink`, and `buildResource` build a hash, an rlink, and a back-matter
   resource. `buildHash` uses SHA-256 when the caller omits the algorithm. `buildResource` generates a UUID when the
   caller gives no `uuid` and no `key`. With a `key` and no `uuid`, the `uuid` is the UUID version 5 of the key, so the
@@ -42,15 +43,16 @@ What exists:
   validates its result, and an omitted optional input is absent from the result. An invalid input gives a `BuilderError`
   that carries one entry for each failing location. A `BuilderError` is not a `ParseError`.
 - The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `LimitExceededError`, `BuilderError`,
-  `NotFoundError`, `ReadError`, and `UnknownElementTypeError`. A `BuilderError` is not a `ParseError`. A `ParseError` of
-  a schema failure carries one entry for each failing location. Use `instanceof` to test the category of an error. A
-  `DocumentTypeMismatchError` is also a `ParseError`, but a `ParseError` is not a `DocumentTypeMismatchError`. The
-  `category` property holds the most specific category. The `limit` property identifies the limit that stopped an
-  operation, for example `nesting-depth` or `alias-expansion`. Test it with `error.limit !== undefined`, because each
-  error has the `limit` key.
+  `NotFoundError`, `ReadError`, `AccessError`, and `UnknownElementTypeError`. A `BuilderError` is not a `ParseError`. A
+  `ParseError` of a schema failure carries one entry for each failing location. Use `instanceof` to test the category of
+  an error. A `DocumentTypeMismatchError` is also a `ParseError`, but a `ParseError` is not a
+  `DocumentTypeMismatchError`. The `category` property holds the most specific category. The `limit` property identifies
+  the limit that stopped an operation, for example `nesting-depth` or `alias-expansion`. Test it with
+  `error.limit !== undefined`, because each error has the `limit` key.
 - A conformance runner. It runs each case of `corpus/1.2.3/cases.json` as one test, with the case id as the test name.
   The cases of parsing, the `round-trip` cases, the `yaml-parse` and `yaml-round-trip` cases, the `element/*` cases, the
-  `element-types` case, the `facade` cases, and the `build-hash`, `build-rlink`, and `build-resource` cases pass.
+  `element-types` case, the `facade` cases, the `assessment-period` cases, and the `build-hash`, `build-rlink`, and
+  `build-resource` cases pass.
   `test/conformance/expected-failures.json` lists each case that needs an operation that does not exist yet. A listed
   case that passes fails the run, and so does a listed id that is not in the corpus. A change that adds an operation
   connects it in `test/support/adapter.ts` and removes the cases that it fixes from the list.
@@ -61,7 +63,6 @@ What exists:
 What does not exist:
 
 - A published npm package
-- The `assessment-period` operation of the conformance corpus
 
 ## Limits
 

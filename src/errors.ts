@@ -116,3 +116,13 @@ export class UnknownElementTypeError extends OscalError {
     this.elementType = elementType;
   }
 }
+
+/** A type-restricted accessor reads a document type that it does not support (ERR-007). */
+export class AccessError extends OscalError {
+  readonly documentType: string;
+
+  constructor(documentType: string, message: string) {
+    super("access-error", message);
+    this.documentType = documentType;
+  }
+}
