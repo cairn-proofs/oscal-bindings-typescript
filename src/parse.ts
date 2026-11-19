@@ -1,3 +1,4 @@
+/// <reference lib="es2025" preserve="true" />
 /**
  * The parse operations (design.md D1, D4 to D7). Each operation runs the stages of one internal pipeline. A stage ends
  * the operation at its first failure, so the binding does no more work on input that is known to be invalid.
