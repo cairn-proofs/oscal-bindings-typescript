@@ -239,6 +239,128 @@
         "BMB-004",
         "ERR-013"
       ]
+    },
+    {
+      "name": "OSCAL_RELEASE",
+      "requirements": [
+        "VER-002"
+      ]
+    },
+    {
+      "name": "OscalError",
+      "requirements": [
+        "ERR-001",
+        "ERR-009",
+        "ERR-010"
+      ]
+    },
+    {
+      "name": "ParseError",
+      "requirements": [
+        "ERR-001",
+        "ERR-003",
+        "ERR-004"
+      ]
+    },
+    {
+      "name": "DocumentTypeMismatchError",
+      "requirements": [
+        "ERR-005",
+        "ERR-009"
+      ]
+    },
+    {
+      "name": "LimitExceededError",
+      "requirements": [
+        "ERR-010",
+        "ERR-011"
+      ]
+    },
+    {
+      "name": "BuilderError",
+      "requirements": [
+        "ERR-013"
+      ]
+    },
+    {
+      "name": "NotFoundError",
+      "requirements": [
+        "ERR-006"
+      ]
+    },
+    {
+      "name": "ReadError",
+      "requirements": [
+        "ERR-012"
+      ]
+    },
+    {
+      "name": "UnknownElementTypeError",
+      "requirements": [
+        "ERR-008"
+      ]
+    },
+    {
+      "name": "AccessError",
+      "requirements": [
+        "ERR-007"
+      ]
+    },
+    {
+      "name": "ErrorCategory",
+      "requirements": [
+        "ERR-001",
+        "ERR-009"
+      ]
+    },
+    {
+      "name": "Limit",
+      "requirements": [
+        "ERR-010"
+      ]
+    },
+    {
+      "name": "FailureEntry",
+      "requirements": [
+        "ERR-003"
+      ]
+    },
+    {
+      "name": "SerializeOptions",
+      "requirements": [
+        "SER-003"
+      ]
+    },
+    {
+      "name": "OscalBody",
+      "requirements": [
+        "FAC-001"
+      ]
+    },
+    {
+      "name": "AssessmentPeriod",
+      "requirements": [
+        "FAC-004"
+      ]
+    },
+    {
+      "name": "ElementValidationResult",
+      "requirements": [
+        "ELV-001"
+      ]
+    },
+    {
+      "name": "RlinkOptions",
+      "requirements": [
+        "BMB-002"
+      ]
+    },
+    {
+      "name": "ResourceOptions",
+      "requirements": [
+        "BMB-003",
+        "BMB-004"
+      ]
     }
   ]
 }
