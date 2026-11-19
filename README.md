@@ -1,13 +1,24 @@
 # oscal-bindings-typescript
 
 > [!WARNING]
-> **Alpha.** The binding reads, checks, and writes OSCAL JSON and OSCAL YAML. It has no npm package and no stability
-> guarantees, and its API can change without notice.
+> **Beta.** The binding reads, checks, and writes OSCAL JSON and OSCAL YAML. It has no stability guarantees, and its
+> API can change without notice.
 
 Typed TypeScript data bindings for [OSCAL](https://pages.nist.gov/OSCAL/), generated from the NIST JSON Schema and the
 naming manifest published by
 [cairn-proofs/oscal-bindings-specs](https://github.com/cairn-proofs/oscal-bindings-specs).
 
+## Install
+```sh
+npm install oscal-bindings
+```
+```ts
+import { OSCAL_RELEASE, parseCatalog } from "oscal-bindings/v1";
+const catalog = parseCatalog(text);
+console.log(OSCAL_RELEASE); // "1.2.3"
+```
+The package has one entry point, `oscal-bindings/v1`. `OSCAL_RELEASE` holds the OSCAL release that the binding was
+generated from. A later OSCAL major version gets a new path. The package needs Node 26.13.0 or later.
 ## Status
 
 The repository holds a working binding for OSCAL JSON and OSCAL YAML.
@@ -56,9 +67,12 @@ What exists:
   `test/conformance/expected-failures.json` lists each case that needs an operation that does not exist yet. A listed
   case that passes fails the run, and so does a listed id that is not in the corpus. A change that adds an operation
   connects it in `test/support/adapter.ts` and removes the cases that it fixes from the list.
-- A traceability record, `openspec/traceability.json`. It has one entry for each exported operation.
-  `test/traceability.test.ts` checks the record against the JSON Schema and the requirement index of the pinned spec
-  artifact.
+- The entry point `oscal-bindings/v1`. It exports each operation, each error class, each named type of a public
+  signature, and the generated model types. `OSCAL_RELEASE` holds the OSCAL release that the binding was generated
+  from, for example `"1.2.3"`.
+- A traceability record, `openspec/traceability.json`. It has one entry for each name that the entry point exports,
+  except the generated model types. `test/traceability.test.ts` checks the record against the JSON Schema and the
+  requirement index of the pinned spec artifact. A test also compares the record with the exports of the entry point.
 
 What does not exist:
 
@@ -332,6 +346,10 @@ spread of both runs. An allocation change is bold when it is over 2%. Time varie
 run again before you act on one bold time. Allocation does not vary, so it is the best signal for a small change. Add
 `--json <file>` to save a run, and `--quick` for a short run that checks the script and gives no usable numbers.
 
+### Release
+A pull request sets the new `version` in `package.json`. After the merge, a maintainer tags the merge commit `v<version>`
+and pushes the tag. The workflow `.github/workflows/release.yml` then builds the package and publishes it to npm with
+trusted publishing. The workflow stops when the tag is not `v<version>`, or when the tagged commit is not on `main`.
 ## License
 
 [Apache-2.0](LICENSE)

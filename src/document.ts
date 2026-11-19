@@ -8,7 +8,7 @@ import { parse, parseFile } from "./parse.ts";
 import { rootKeys } from "./validators.ts";
 
 /** The union of the eight body types. */
-type OscalBody = NonNullable<
+export type OscalBody = NonNullable<
   OscalDocument[
     | "assessment-plan"
     | "assessment-results"

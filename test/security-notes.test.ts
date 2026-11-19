@@ -22,7 +22,9 @@ const { buildHash, buildRlink } = backmatter;
 const root = path.resolve(import.meta.dirname, "..");
 const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as {
+  name: string;
   private?: boolean;
+  exports: Record<string, unknown>;
   dependencies: Record<string, string>;
 };
 
@@ -76,17 +78,8 @@ test("the README holds the security notes section and each of its notes", () => 
   }
 });
 
-test("each operation that the notes name exists", () => {
-  const exported: Record<string, unknown> = {
-    ...parseModule,
-    ...backmatter,
-    ...documentModule,
-    serialize,
-    serializeYaml,
-    NotFoundError,
-    ParseError,
-    ReadError,
-  };
+test("each operation that the notes name exists", async () => {
+  const exported = (await import("../src/v1/index.ts")) as Record<string, unknown>;
   const names = [
     "parse",
     "parseFile",
@@ -297,8 +290,10 @@ test('security note "Audit": the library source writes no log and no file', () =
   }
 });
 
-test('security note "Install the binding": the package is private and has three runtime dependencies', () => {
-  assert.equal(packageJson.private, true, `The package is no longer private. ${stale("Install the binding")}`);
+test('security note "Install the binding": the package is public, exports only v1, and has three runtime dependencies', () => {
+  assert.equal(packageJson.name, "oscal-bindings", stale("Install the binding"));
+  assert.equal(packageJson.private, undefined, `The package is private. ${stale("Install the binding")}`);
+  assert.deepEqual(Object.keys(packageJson.exports), ["./v1"], stale("Install the binding"));
   assert.deepEqual(
     Object.keys(packageJson.dependencies).sort(),
     ["ajv", "ajv-formats", "yaml"],

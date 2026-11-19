@@ -1,13 +1,27 @@
 {
-  "name": "oscal-bindings-typescript",
-  "private": true,
-  "description": "Typed TypeScript data bindings for OSCAL, generated from the NIST JSON Schema and the oscal-bindings-specs naming manifest. Not published yet.",
+  "name": "oscal-bindings",
+  "version": "0.2.0",
+  "description": "Typed TypeScript data bindings for OSCAL, generated from the NIST JSON Schema and the oscal-bindings-specs naming manifest.",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cairn-proofs/oscal-bindings-typescript.git"
+  },
   "type": "module",
   "engines": {
-    "node": "26.13.0"
+    "node": ">=26.13.0"
   },
+  "exports": {
+    "./v1": {
+      "types": "./dist/v1/index.d.ts",
+      "default": "./dist/v1/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "artifact": "tsx scripts/spec-artifact.ts",
@@ -17,13 +31,14 @@
     "fixtures": "tsx scripts/type-fixtures.ts",
     "global-names": "tsx scripts/global-names.ts",
     "bench": "tsx scripts/benchmark.ts",
+    "pack:check": "tsx scripts/pack-check.ts",
     "validate": "openspec validate --all --strict",
-    "check": "npm run typecheck && npm run test && npm run generate:check && npm run fixtures && npm run types:check && npm run global-names && npm run validate"
+    "check": "npm run typecheck && npm run test && npm run generate:check && npm run fixtures && npm run types:check && npm run global-names && npm run pack:check && npm run validate"
   },
   "dependencies": {
-    "ajv": "8.20.0",
-    "ajv-formats": "3.0.1",
-    "yaml": "2.9.1"
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@types/node": "26.6.6",

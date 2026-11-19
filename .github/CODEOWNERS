@@ -16,3 +16,6 @@
 /README.md                       @dfkunstler
 /src/*.ts                        @dfkunstler
 /test/security-notes.test.ts     @dfkunstler
+# These files define what the published package exposes and what it holds.
+/src/v1/                         @dfkunstler
+/tsconfig.build.json             @dfkunstler
