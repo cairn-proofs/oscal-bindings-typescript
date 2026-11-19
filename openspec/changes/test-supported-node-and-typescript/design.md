@@ -88,8 +88,10 @@ version from nodejs.org, and an exact TypeScript version:
 The job name is `consumer (node <line>, ts <line>)`, from the lines only. Each leg has these steps:
 
 1. Check out `test/consumer/` only.
-2. Download the Node tarball of the leg from `https://nodejs.org/dist/`. Stop the job when its sha256 differs from the
-   matrix value. Extract it, and put its `bin` directory first on `PATH`.
+2. Restore the Node tarball of the leg from `actions/cache`, with a key that holds the Node version and its sha256.
+   When the file is missing, or fails the sha256 check, download it from `https://nodejs.org/dist/` with `curl
+   --retry 3`. Stop the job when the sha256 of the file differs from the matrix value. Extract it, and put its `bin`
+   directory first on `PATH`.
 3. Download the `consumer-package` artifact.
 4. Copy `test/consumer/` to an empty directory. Write a `package.json` with `"type": "module"`. Install the tarball and
    `typescript@<exact version>` with `npm install --ignore-scripts --no-audit --no-fund`.
@@ -104,6 +106,9 @@ pinned toolchain. `jdx/mise-action` cannot install a Node version that `mise.loc
 
 **Alternative:** a moving version such as `22` for each leg. It does not test the floor, and a Node release can turn a
 leg red with no change in the repository.
+
+The sha256 check runs on each run, so a cache entry that is wrong cannot change the Node that a leg uses. The cache
+and the retry lower the number of runs that a failed download from nodejs.org turns red.
 
 **Alternative:** `actions/setup-node`, pinned by commit. It does not check a sha256 of the Node binary that it
 installs.
