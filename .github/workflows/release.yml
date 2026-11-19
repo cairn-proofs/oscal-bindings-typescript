@@ -5,6 +5,8 @@ name: Release
 # repository holds no npm token. npm adds a provenance attestation to the release.
 # The publish job has id-token: write, so it runs only code that a lock records: the toolchain of mise.lock. It installs
 # no package.
+# The docs job deploys the API reference of the same release. It runs only after the publish job succeeds, so the site
+# never describes a version that npm does not have.
 on:
   release:
     types: [published]
@@ -93,4 +95,16 @@ jobs:
             echo "npm already has ${name}@${version}. Nothing to publish."
             exit 0
           fi
-          npm publish "dist-package/${name}-${version}.tgz"
+          # The path starts with ./, because npm reads dist-package/x.tgz as a GitHub repository shorthand.
+          npm publish "./dist-package/${name}-${version}.tgz"
+  # Calls docs.yml, which verifies and deploys the signed zip of the API reference. It needs publish, so a failed
+  # publish gives no deploy.
+  docs:
+    needs: publish
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/docs.yml
+    with:
+      tag: ${{ github.event.release.tag_name }}

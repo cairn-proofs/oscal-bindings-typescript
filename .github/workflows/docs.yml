@@ -1,20 +1,24 @@
 name: Docs
-# Publishing a release deploys the API reference of its tag to GitHub Pages. build.yml built the site after the check
-# gate passed, signed the zip of the site, and attached the zip to the draft release. This workflow downloads that
-# file, verifies its signature, and deploys those exact files. It never builds the site.
-# A maintainer can run the workflow by hand, for the first deploy or to repeat a failed one. Start the manual run from
-# the tag, for example `gh workflow run docs.yml --ref v<version> -f tag=v<version>`. The first step fails the run
-# unless the run ref is the tag v* that the release or the input names. The environment github-pages must allow only
-# the tags v*.
+# Deploys the API reference of a release tag to GitHub Pages. build.yml built the site after the check gate passed,
+# signed the zip of the site, and attached the zip to the draft release. This workflow downloads that file, verifies its
+# signature, and deploys those exact files. It never builds the site.
+# release.yml calls this workflow after the publish to npm succeeds, so a failed publish gives no deploy. A maintainer
+# can also run the workflow by hand, to deploy again or to repeat a failed deploy. Start the manual run from the tag,
+# for example `gh workflow run docs.yml --ref v<version> -f tag=v<version>`. The first step fails the run unless the
+# run ref is the tag v* that the input names. The environment github-pages must allow only the tags v*.
 # The job has pages: write and id-token: write, so it runs no code from the repository. It checks out nothing and
 # installs nothing.
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to deploy, for example v0.2.3"
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to deploy, for example v0.2.1"
+        description: "Release tag to deploy, for example v0.2.3"
         required: true
         type: string
 permissions:
@@ -38,7 +42,7 @@ jobs:
       # environment, not from an expression in the script.
       - name: Check the run ref
         env:
-          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          TAG: ${{ inputs.tag }}
         run: |
           if [ "${GITHUB_REF_TYPE}" != "tag" ] || [[ "${GITHUB_REF_NAME}" != v* ]] || [ "${GITHUB_REF_NAME}" != "${TAG}" ]; then
             echo "The run ref ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME} is not the tag ${TAG}, or the tag does not start with v." >&2
@@ -47,7 +51,7 @@ jobs:
       - name: Download the API reference
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          TAG: ${{ inputs.tag }}
         run: gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" -D dist/ --pattern "api-docs.zip"
       # Refuse a file that the attest job of build.yml did not sign for this tag. The signer workflow and the source ref
       # are fixed here, and the job does not read them from the release. The source digest is the commit that the tag
@@ -55,7 +59,7 @@ jobs:
       - name: Verify the build provenance
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+          TAG: ${{ inputs.tag }}
         run: |
           digest="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq .sha)"
           if ! [[ "${digest}" =~ ^[0-9a-f]{40}$ ]]; then
