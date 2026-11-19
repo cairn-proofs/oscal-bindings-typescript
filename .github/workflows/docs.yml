@@ -1,7 +1,7 @@
 name: Docs
 # Publishing a release builds the API reference of its tag and deploys it to GitHub Pages. A maintainer can run the
 # workflow by hand, for the first deploy or to repeat a failed one. Start the manual run from the tag, for example
-# `gh workflow run docs.yml --ref v0.2.0 -f tag=v0.2.0`. The first step fails the run unless the run ref is the tag v*
+# `gh workflow run docs.yml --ref v<version> -f tag=v<version>`. The first step fails the run unless the run ref is the tag v*
 # that the release or the input names. The environment github-pages must allow only the tags v*.
 # The job has pages: write and id-token: write, so it runs only code that a lock records: the toolchain of mise.lock and
 # the packages of api-docs/package-lock.json. It does not run the check gate, because the CI run of the commit on main
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to deploy, for example v0.2.0"
+        description: "Release tag to deploy, for example v0.2.1"
         required: true
         type: string
 permissions:

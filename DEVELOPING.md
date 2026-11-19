@@ -35,5 +35,5 @@ and pushes the tag. The workflow `.github/workflows/release.yml` then builds the
 trusted publishing. The workflow stops when the tag is not `v<version>`, or when the tagged commit is not on `main`.
 When the release is published, the workflow `.github/workflows/docs.yml` builds the API reference of the tag and deploys
 it to GitHub Pages. A maintainer can run that workflow by hand to deploy the first site or to repeat a failed
-deploy. The run starts from the tag, for example `gh workflow run docs.yml --ref v0.2.0 -f tag=v0.2.0`, because the
+deploy. The run starts from the tag, for example `gh workflow run docs.yml --ref v<version> -f tag=v<version>`, because the
 environment `github-pages` allows only the tags `v*`.
