@@ -4,7 +4,8 @@ name: CI
 # A v* tag also builds the package after the check gate passes, signs the package and the API reference, and attaches
 # both to a draft GitHub release. Publishing that draft starts release.yml, which verifies the signature and publishes
 # the tarball to npm, and docs.yml, which verifies the signature and deploys the API reference to GitHub Pages.
-# Nothing downstream builds either file again.
+# Nothing downstream builds either file again. Outside tags, the consumer legs test the packed tarball on three lines
+# of Node and TypeScript.
 on:
   push:
     branches: ["main"]
@@ -51,6 +52,110 @@ jobs:
           name: api-docs
           path: api-docs/site/
           if-no-files-found: error
+  # Packs the tarball once for the consumer legs. It has no needs, so it runs in parallel with the check gate, and the
+  # legs do not wait for the gate. It does not run on a tag: the package job packs the release tarball.
+  consumer-package:
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install toolchain (mise)
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
+        with:
+          version: 2026.9.15
+      - name: Install dependencies
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Pack
+        run: |
+          mkdir dist-package
+          npm pack --pack-destination dist-package
+          ls -l dist-package
+      - name: Upload the package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: consumer-package
+          path: dist-package/*.tgz
+          if-no-files-found: error
+  # Tests the packed tarball as a consumer installs it, on each supported line of Node and of TypeScript. Leg 1 uses
+  # the floor of engines.node. A leg installs the tarball and the TypeScript of the leg in an empty project, with no
+  # lockfile, so npm resolves the dependencies of the package as it does for a consumer. A leg reports the run on Node
+  # and the type check as two steps. The check name comes from the lines only, so a patch version that moves does not
+  # change the name that the ruleset "main: require PR and CI" requires. A change to the lines of a leg also changes
+  # that ruleset. Each node-sha256 is the linux-x64 value from the SHASUMS256.txt of that Node version on nodejs.org.
+  consumer:
+    name: consumer (node ${{ matrix.node-line }}, ts ${{ matrix.ts-line }})
+    needs: consumer-package
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node-line: "22"
+            ts-line: "5.9"
+            node-version: 22.12.0
+            node-sha256: e05a4d65232ae2b27b3d77da2e368522fb46b923335b8e0d5f77624c32484044
+            ts-version: 5.9.3
+          - node-line: "24"
+            ts-line: "6.0"
+            node-version: 24.22.3
+            node-sha256: 061ec3e3062115705b56b51fa9cc330ab50d34b6969387d4e4b1a50c6809acc2
+            ts-version: 6.0.3
+          - node-line: "26"
+            ts-line: "7.0"
+            node-version: 26.13.0
+            node-sha256: 5848553868b402d3fabb5b09270649977780a390f832155721025a08b5104455
+            ts-version: 7.0.2
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          sparse-checkout: test/consumer
+          persist-credentials: false
+      # The values come from the environment, not from expressions in the script. The job stops when the sha256 of the
+      # download differs from the matrix value.
+      - name: Install Node
+        env:
+          NODE_VERSION: ${{ matrix.node-version }}
+          NODE_SHA256: ${{ matrix.node-sha256 }}
+        run: |
+          file="node-v${NODE_VERSION}-linux-x64.tar.gz"
+          curl --fail --silent --show-error --location --output "${RUNNER_TEMP}/${file}" "https://nodejs.org/dist/v${NODE_VERSION}/${file}"
+          echo "${NODE_SHA256}  ${RUNNER_TEMP}/${file}" | sha256sum --check -
+          mkdir "${RUNNER_TEMP}/node"
+          tar --extract --gzip --strip-components=1 --directory "${RUNNER_TEMP}/node" --file "${RUNNER_TEMP}/${file}"
+          echo "${RUNNER_TEMP}/node/bin" >> "${GITHUB_PATH}"
+      - name: Download the package
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: consumer-package
+          path: ${{ runner.temp }}/package
+      - name: Install the package and TypeScript in an empty project
+        id: install
+        env:
+          TS_VERSION: ${{ matrix.ts-version }}
+        run: |
+          node --version
+          cp -r test/consumer "${RUNNER_TEMP}/consumer"
+          cd "${RUNNER_TEMP}/consumer"
+          echo '{"name":"consumer","private":true,"type":"module"}' > package.json
+          npm install --ignore-scripts --no-audit --no-fund "${RUNNER_TEMP}"/package/*.tgz "typescript@${TS_VERSION}"
+      - name: Run on Node
+        run: |
+          cd "${RUNNER_TEMP}/consumer"
+          node check.mjs
+      # Runs when the install succeeds, also when the run on Node fails, so each leg reports both results.
+      - name: Type-check with TypeScript
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          cd "${RUNNER_TEMP}/consumer"
+          ./node_modules/.bin/tsc --version
+          ./node_modules/.bin/tsc -p tsconfig.json
   # The release tag preflight. It runs in parallel with the check gate and fails fast. A release comes only from main,
   # and the tag is v and the version of package.json.
   tag-check:

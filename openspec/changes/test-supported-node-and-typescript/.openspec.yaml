@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-11-19
+# The change adds CI jobs and widens the declared Node range. It adds no requirement and changes no behavior of the
+# binding. The contract is in the oscal-bindings-specs store.
+skip_specs: true
