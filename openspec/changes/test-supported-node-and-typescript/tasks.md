@@ -30,7 +30,7 @@
 - [x] 3.3 Open the pull request. Verify that the three legs run in parallel after `consumer-package`, that each leg
   shows "Run on Node" and "Type-check with TypeScript" as separate green steps, and that the check names are
   `consumer (node 22, ts 5.9)`, `consumer (node 24, ts 6.0)` and `consumer (node 26, ts 7.0)`.
-- [ ] 3.4 Open two draft pull requests from the branch of 3.3, one for each deliberate break of the
+- [x] 3.4 Open two draft pull requests from the branch of 3.3, one for each deliberate break of the
   [migration plan](design.md#migration-plan). Verify that each break turns only leg 1 red, on the step that the
   migration plan names, that the other step of leg 1 is green, and that legs 2 and 3 are green. Close both drafts
   without a merge.
