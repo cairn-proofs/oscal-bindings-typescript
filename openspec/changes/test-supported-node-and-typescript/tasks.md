@@ -27,7 +27,7 @@
   leg 2. Take each sha256 from the `SHASUMS256.txt` of that Node version on nodejs.org, and verify that the value for
   26.13.0 equals the `linux-x64` checksum in `mise.lock`. Verify that `actionlint` passes and that each action is
   pinned by commit.
-- [ ] 3.3 Open the pull request. Verify that the three legs run in parallel after `consumer-package`, that each leg
+- [x] 3.3 Open the pull request. Verify that the three legs run in parallel after `consumer-package`, that each leg
   shows "Run on Node" and "Type-check with TypeScript" as separate green steps, and that the check names are
   `consumer (node 22, ts 5.9)`, `consumer (node 24, ts 6.0)` and `consumer (node 26, ts 7.0)`.
 - [ ] 3.4 Open two draft pull requests from the branch of 3.3, one for each deliberate break of the
