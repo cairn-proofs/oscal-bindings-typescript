@@ -1,6 +1,8 @@
 name: Docs
 # Publishing a release builds the API reference of its tag and deploys it to GitHub Pages. A maintainer can run the
-# workflow by hand with a tag, for the first deploy or to repeat a failed one.
+# workflow by hand, for the first deploy or to repeat a failed one. Start the manual run from the tag, for example
+# `gh workflow run docs.yml --ref v0.2.0 -f tag=v0.2.0`. The first step fails the run unless the run ref is the tag v*
+# that the release or the input names. The environment github-pages must allow only the tags v*.
 # The job has pages: write and id-token: write, so it runs only code that a lock records: the toolchain of mise.lock and
 # the packages of api-docs/package-lock.json. It does not run the check gate, because the CI run of the commit on main
 # already ran it.
@@ -30,6 +32,16 @@ jobs:
       group: pages
       cancel-in-progress: false
     steps:
+      # The run is on a tag v*, and the tag that the job builds is the tag of the run. The values come from the
+      # environment, not from an expression in the script.
+      - name: Check the run ref
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          if [ "${GITHUB_REF_TYPE}" != "tag" ] || [[ "${GITHUB_REF_NAME}" != v* ]] || [ "${GITHUB_REF_NAME}" != "${TAG}" ]; then
+            echo "The run ref ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME} is not the tag ${TAG}, or the tag does not start with v." >&2
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
