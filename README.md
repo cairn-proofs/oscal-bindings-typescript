@@ -7,8 +7,7 @@
   <a href="https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/oscal-bindings.svg"></a>
 </p>
 
-> [!IMPORTANT]
-> **Beta.** The binding reads, checks, and writes OSCAL JSON and OSCAL YAML. It has no stability guarantees, and its API can change without notice.
+
 
 Typed TypeScript data bindings for [OSCAL](https://pages.nist.gov/OSCAL/) (Open Security Controls Assessment Language) v1.2.3, generated from the NIST JSON Schema and the naming manifest of [cairn-proofs/oscal-bindings-specs](https://github.com/cairn-proofs/oscal-bindings-specs).
 
@@ -22,6 +21,9 @@ Typed TypeScript data bindings for [OSCAL](https://pages.nist.gov/OSCAL/) (Open 
 API reference: <https://cairn-proofs.github.io/oscal-bindings-typescript/>
 
 ## Installation
+
+[!IMPORTANT]
+**Beta.** The binding reads, checks, and writes OSCAL JSON and OSCAL YAML. It has no stability guarantees, and its API can change without notice.
 
 ```sh
 npm install oscal-bindings
