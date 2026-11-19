@@ -49,9 +49,10 @@ None.
 ## Impact
 
 1. New files: `docs/limits.md`, `docs/security.md`, `DEVELOPING.md`, `PERFORMANCE.md`, `api-docs/package.json`,
-   `api-docs/package-lock.json`, `api-docs/typedoc.json`, `api-docs/.npmrc`, `.github/workflows/docs.yml`.
+   `api-docs/package-lock.json`, `api-docs/typedoc.json`, `api-docs/.npmrc`, `.github/workflows/docs.yml`, `spec-pin.json`, `test/spec-pin.test.ts`.
 2. Changed files: `README.md`, `package.json` (one script), `test/security-notes.test.ts`, `.github/CODEOWNERS`,
-   `.github/workflows/build.yml`, `.gitignore`.
+   `.github/workflows/build.yml`, `.gitignore`. The README badge row has the spec-pin badge of the oscal-bindings-specs
+   store.
 3. New development dependencies, in `api-docs/` only: `typedoc` and `typescript` 6.0.x. The published package gains no
    dependency, and `pack:check` still sees the same three files.
 4. The change adds a workflow with `pages: write` and `id-token: write`. It runs only code that a lockfile records.

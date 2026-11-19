@@ -8,7 +8,8 @@ npm run check
 ```
 
 The check gate downloads a pinned spec artifact release from cairn-proofs/oscal-bindings-specs over HTTPS. The pin is
-release `v0.8.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256.
+release `v0.8.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256. A change that moves the pin also sets `version` in `spec-pin.json`, which
+the spec-pin badge of the README reads. `test/spec-pin.test.ts` fails when the two differ.
 ## API reference
 `npm run docs` builds the API reference with TypeDoc into `api-docs/site/`. TypeDoc does not support the TypeScript 7 of
 the root package, so `api-docs/` is a separate package with its own `package.json`, its own lockfile and its own

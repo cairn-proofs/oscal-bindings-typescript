@@ -10,6 +10,7 @@
 /.npmrc            @dfkunstler
 /mise.lock         @dfkunstler
 /mise.toml         @dfkunstler
+/spec-pin.json     @dfkunstler
 
 # These files hold the behavior that docs/security.md ("Security notes for consumers") describes, and the tests that
 # pin it. A change here can make a note false. The reviewer checks that the notes and test/security-notes.test.ts still

@@ -1,5 +1,6 @@
 # oscal-bindings (TypeScript)
 <p align="center">
+  <a href="https://github.com/cairn-proofs/oscal-bindings-specs"><img alt="oscal-bindings-specs" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fcairn-proofs%2Foscal-bindings-typescript%2Fmain%2Fspec-pin.json&query=%24.version&label=oscal-bindings-specs"></a>
   <a href="https://github.com/cairn-proofs/oscal-bindings-typescript/actions/workflows/build.yml"><img alt="CI" src="https://github.com/cairn-proofs/oscal-bindings-typescript/actions/workflows/build.yml/badge.svg?branch=main"></a>
   <a href="https://www.npmjs.com/package/oscal-bindings"><img alt="npm" src="https://img.shields.io/npm/v/oscal-bindings.svg"></a>
   <a href="https://www.npmjs.com/package/oscal-bindings"><img alt="Node versions" src="https://img.shields.io/node/v/oscal-bindings.svg"></a>

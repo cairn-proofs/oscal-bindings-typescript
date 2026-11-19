@@ -41,7 +41,7 @@ The README follows the order of the Python README. A section that has no peer co
 
 | README section | Source |
 |---|---|
-| Badges | New. CI, npm version, license, Node version. |
+| Badges | New. Spec pin, CI, npm version, Node version, license. |
 | Description and feature bullets | "Why use it" of the current README, cut to six bullets. |
 | Install | "Install" of the current README, minus the version paragraph. |
 | Quick start | New. Parse, read, serialize and reject, on one catalog. |
@@ -59,8 +59,10 @@ The long text moves without a change of meaning:
 3. "Development", "How the binding is checked" and "Release" go to `DEVELOPING.md`.
 4. "Benchmarks" goes to `PERFORMANCE.md`. The file holds the how-to of `npm run bench`. It holds no measured numbers.
 
-The Python badge for the spec pin reads `spec-pin.json`. This repo keeps its pin in `scripts/spec-artifact.ts`, which a
-badge cannot read, so the README has no spec-pin badge.
+The Python badge for the spec pin reads `spec-pin.json`. This repo adds that file at its root, with the version that
+`SPEC_ARTIFACT_VERSION` holds in `scripts/spec-artifact.ts`. `test/spec-pin.test.ts` fails when the two differ, so the
+badge cannot show a stale version. The badge follows the sticker of the oscal-bindings-specs store. The README has no
+conformance badge.
 
 **Why:** the user chose the Python layout as the model. The long sections keep their text, so a reader loses nothing and
 the README shrinks.
