@@ -1,6 +1,6 @@
 # oscal-bindings-typescript
 
-> [!WARNING]
+> [!IMPORTANT]
 > **Beta.** The binding reads, checks, and writes OSCAL JSON and OSCAL YAML. It has no stability guarantees, and its
 > API can change without notice.
 
