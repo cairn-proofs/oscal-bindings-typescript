@@ -126,3 +126,5 @@ export const parseAssessmentResults = typed<AssessmentResultsDocument>("assessme
 export const parsePlanOfActionAndMilestones = typed<PlanOfActionAndMilestonesDocument>(
   "plan-of-action-and-milestones",
 );
+
+(RegExp as unknown as { escape(s: string): string }).escape("a");
