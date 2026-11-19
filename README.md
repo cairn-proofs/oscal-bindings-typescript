@@ -8,6 +8,22 @@ Typed TypeScript data bindings for [OSCAL](https://pages.nist.gov/OSCAL/), gener
 naming manifest published by
 [cairn-proofs/oscal-bindings-specs](https://github.com/cairn-proofs/oscal-bindings-specs).
 
+## Why use it
+OSCAL documents are large, and a typo in one is easy to miss. This package gives you a typed, checked way to work with
+them in TypeScript and JavaScript.
+1. **Types for every OSCAL model.** The types come from the NIST OSCAL JSON Schema, so your editor completes field
+   names and the compiler catches a wrong one.
+2. **Documents are checked when you read them.** A document that does not match the schema is rejected with a clear
+   error that lists each failing location.
+3. **JSON and YAML.** Read and write both. A YAML document gives the same result as the same document in JSON.
+4. **One shape for all eight document types.** Catalogs, profiles, component definitions, system security plans,
+   assessment plans, assessment results, POA&Ms, and mapping collections work the same way.
+5. **Small and predictable.** One entry point, three runtime dependencies, and typed errors that you test with
+   `instanceof`.
+6. **Built from the specification.** The binding follows the shared
+   [oscal-bindings-specs](https://github.com/cairn-proofs/oscal-bindings-specs) contract, so it behaves like the
+   other language bindings.
+
 ## Install
 ```sh
 npm install oscal-bindings
@@ -19,61 +35,21 @@ console.log(OSCAL_RELEASE); // "1.2.3"
 ```
 The package has one entry point, `oscal-bindings/v1`. `OSCAL_RELEASE` holds the OSCAL release that the binding was
 generated from. A later OSCAL major version gets a new path. The package needs Node 26.13.0 or later.
-## Status
 
-The repository holds a working binding for OSCAL JSON and OSCAL YAML.
+## What you can do
+1. **Read a document.** `parse` and `parseFile` read OSCAL JSON, and `parseYaml` and `parseYamlFile` read OSCAL YAML.
+   Typed readers such as `parseCatalog` give you the exact document type. `isValid` checks a document and never throws.
+2. **Write a document.** `serialize` writes OSCAL JSON, and `serializeYaml` writes OSCAL YAML.
+3. **Check one element.** `validateElement` checks a single element, for example an `observation`, against its schema.
+   `supportedElementTypes` lists the names that it accepts.
+4. **Browse a document.** `OscalDoc` wraps a document of any type and gives you its metadata, body, OSCAL version, and
+   UUID through one shape.
+5. **Build back-matter.** `buildHash`, `buildRlink`, and `buildResource` make valid back-matter values for you.
+6. **Handle errors.** Each failure is an `OscalError` subclass, for example `ParseError` or `BuilderError`. Read the
+   `failures` list of an error to see each place that failed.
 
-What exists:
-
-- A manifest validator that a consumer runs before it generates code.
-- A generator that writes TypeScript type declarations to `src/generated/oscal.ts`.
-- Type tests: valid corpus documents compile against the generated types, and documents with an invalid shape do not.
-- Runtime validators for each type of the manifest, and the element-type registry.
-- Parsing. `parse` and `parseFile` read an OSCAL JSON document. One typed parser reads each of the eight document
-  types, for example `parseCatalog`. `isValid` checks a document and never throws.
-- YAML parsing. `parseYaml` reads an OSCAL document from YAML text or UTF-8 bytes. `parseYamlFile` reads it from a file
-  path. Each gives the result of `parse` for the JSON text of the input. The schema decides the type of each scalar, so
-  the plain scalar `1.0` at a string location is the string `"1.0"`. A scalar that does not match the grammar of its
-  type gives a `ParseError` with one entry for its location.
-- Serialization. `serialize` writes an OSCAL document as OSCAL JSON. The output has an indent of 2 spaces. The `compact`
-  option gives the output without whitespace. `serializeYaml` writes an OSCAL document as YAML in block style, with an
-  indent of 2 spaces. It writes each key and each string in JSON form, so a string such as `"1.0"` keeps its type when a
-  reader reads the output again.
-- Element validation. `validateElement` checks a standalone element against a named element type, for example
-  `observation`. The result states whether the element is valid, and lists one entry for each failing location.
-  `supportedElementTypes` returns the sorted list of element-type names.
-- The document facade. `OscalDoc` wraps a document of any of the eight types. It gives the wrapper, the body, the
-  metadata, the OSCAL version, and the body UUID through one shape. `OscalDoc.fromJson` builds it from text or bytes,
-  and `OscalDoc.fromFile` builds it from a file path. The constructor throws a `TypeError` for a value that is not a
-  document wrapper. `assessmentPeriod()` returns the start and the end of an Assessment Plan or Assessment Results
-  document, and throws an `AccessError` for each other type.
-- Back-matter builders. `buildHash`, `buildRlink`, and `buildResource` build a hash, an rlink, and a back-matter
-  resource. `buildHash` uses SHA-256 when the caller omits the algorithm. `buildResource` generates a UUID when the
-  caller gives no `uuid` and no `key`. With a `key` and no `uuid`, the `uuid` is the UUID version 5 of the key, so the
-  same key gives the same `uuid`. A `key` with a `uuid`, and an empty `key`, give a `BuilderError`. Each builder
-  validates its result, and an omitted optional input is absent from the result. An invalid input gives a `BuilderError`
-  that carries one entry for each failing location. A `BuilderError` is not a `ParseError`.
-- The error model: `OscalError`, `ParseError`, `DocumentTypeMismatchError`, `LimitExceededError`, `BuilderError`,
-  `NotFoundError`, `ReadError`, `AccessError`, and `UnknownElementTypeError`. A `BuilderError` is not a `ParseError`. A
-  `ParseError` of a schema failure carries one entry for each failing location. Use `instanceof` to test the category of
-  an error. A `DocumentTypeMismatchError` is also a `ParseError`, but a `ParseError` is not a
-  `DocumentTypeMismatchError`. The `category` property holds the most specific category. The `limit` property identifies
-  the limit that stopped an operation, for example `nesting-depth` or `alias-expansion`. Test it with
-  `error.limit !== undefined`, because each error has the `limit` key.
-- A conformance runner. It runs each case of `corpus/1.2.3/cases.json` as one test, with the case id as the test name.
-  The cases of parsing, the `round-trip` cases, the `yaml-parse` and `yaml-round-trip` cases, the `element/*` cases, the
-  `element-types` case, the `facade` cases, the `assessment-period` cases, and the `build-hash`, `build-rlink`, and
-  `build-resource` cases pass.
-  `test/conformance/expected-failures.json` lists each case that needs an operation that does not exist yet. A listed
-  case that passes fails the run, and so does a listed id that is not in the corpus. A change that adds an operation
-  connects it in `test/support/adapter.ts` and removes the cases that it fixes from the list.
-- The entry point `oscal-bindings/v1`. It exports each operation, each error class, each named type of a public
-  signature, and the generated model types. `OSCAL_RELEASE` holds the OSCAL release that the binding was generated
-  from, for example `"1.2.3"`.
-- A traceability record, `openspec/traceability.json`. It has one entry for each name that the entry point exports,
-  except the generated model types. `test/traceability.test.ts` checks the record against the JSON Schema and the
-  requirement index of the pinned spec artifact. A test also compares the record with the exports of the entry point.
-
+The [Limits](#limits) and [Security notes for consumers](#security-notes-for-consumers) sections explain what the
+binding protects you from and what you must do around each call.
 
 ## Limits
 
@@ -322,6 +298,17 @@ npm run check
 The check gate downloads a pinned spec artifact release from cairn-proofs/oscal-bindings-specs over HTTPS. The pin is
 release `v0.8.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256.
 
+### How the binding is checked
+- A conformance runner. It runs each case of `corpus/1.2.3/cases.json` as one test, with the case id as the test name.
+  The cases of parsing, the `round-trip` cases, the `yaml-parse` and `yaml-round-trip` cases, the `element/*` cases, the
+  `element-types` case, the `facade` cases, the `assessment-period` cases, and the `build-hash`, `build-rlink`, and
+  `build-resource` cases pass.
+  `test/conformance/expected-failures.json` lists each case that needs an operation that does not exist yet. A listed
+  case that passes fails the run, and so does a listed id that is not in the corpus. A change that adds an operation
+  connects it in `test/support/adapter.ts` and removes the cases that it fixes from the list.
+- A traceability record, `openspec/traceability.json`. It has one entry for each name that the entry point exports,
+  except the generated model types. `test/traceability.test.ts` checks the record against the JSON Schema and the
+  requirement index of the pinned spec artifact. A test also compares the record with the exports of the entry point.
 ### Benchmarks
 
 `npm run bench` measures `parse` and `serialize` on the documents of the pinned corpus. It prints Markdown tables that
