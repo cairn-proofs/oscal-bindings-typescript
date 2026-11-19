@@ -1,9 +1,10 @@
 name: CI
 # Runs on each pull request update, on each push to main, on each v* tag, and by hand. The check gate downloads the
 # pinned spec artifact from cairn-proofs/oscal-bindings-specs and checks its sha256 before it uses any file from it.
-# A v* tag also builds the package after the check gate passes, signs it, and attaches it to a draft GitHub release.
-# Publishing that draft starts release.yml, which verifies the signature and publishes those exact files to npm.
-# Nothing downstream builds the package again.
+# A v* tag also builds the package after the check gate passes, signs the package and the API reference, and attaches
+# both to a draft GitHub release. Publishing that draft starts release.yml, which verifies the signature and publishes
+# the tarball to npm, and docs.yml, which verifies the signature and deploys the API reference to GitHub Pages.
+# Nothing downstream builds either file again.
 on:
   push:
     branches: ["main"]
@@ -42,6 +43,14 @@ jobs:
       # Builds the API reference with TypeDoc, from the separate package in api-docs/. A warning fails the build.
       - name: Docs
         run: npm run docs
+      # The API reference that the gate built for this tag. The attest job signs it.
+      - name: Upload the API reference
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: api-docs
+          path: api-docs/site/
+          if-no-files-found: error
   # The release tag preflight. It runs in parallel with the check gate and fails fast. A release comes only from main,
   # and the tag is v and the version of package.json.
   tag-check:
@@ -98,11 +107,12 @@ jobs:
           name: npm-package
           path: dist-package/*.tgz
           if-no-files-found: error
-  # Signs the build provenance of the tarball. The signature binds the digest of the file to this workflow, the commit
-  # and the tag. release.yml verifies it before the publish, so it refuses a file that this job did not sign. Only this
-  # job holds id-token and attestations write.
+  # Signs the build provenance of the tarball and of the zip of the API reference. Each signature binds the digest of the
+  # file to this workflow, the commit and the tag. release.yml verifies the tarball and docs.yml verifies the zip
+  # before they use it, so each refuses a file that this job did not sign. Only this job holds id-token and
+  # attestations write.
   attest:
-    needs: package
+    needs: [build, package]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -115,29 +125,45 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
           name: npm-package
-          path: dist-package/
+          path: release-assets/
+      - name: Download the API reference
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: api-docs
+          path: api-docs/
+      # index.html is at the root of the zip, because zip runs inside the folder of the site.
+      - name: Zip the API reference
+        run: (cd api-docs && zip -r -q ../release-assets/api-docs.zip .)
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8  # v4.2.2
         with:
-          subject-path: dist-package/*.tgz
-  # Creates the draft release with the signed tarball attached. A draft never exists without an attestation, because
-  # this job needs attest. A maintainer reviews the draft and publishes it, which starts release.yml.
+          subject-path: |
+            release-assets/*.tgz
+            release-assets/api-docs.zip
+      - name: Upload the signed files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: release-assets
+          path: release-assets/*
+          if-no-files-found: error
+  # Creates the draft release with the signed tarball and the signed zip of the API reference attached. A draft never
+  # exists without an attestation, because this job needs attest. A maintainer reviews the draft and publishes it, which starts release.yml.
   draft-release:
-    needs: [package, attest]
+    needs: attest
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: write
     steps:
-      - name: Download the package
+      - name: Download the signed files
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
         with:
-          name: npm-package
-          path: dist-package/
+          name: release-assets
+          path: release-assets/
       # The tag comes from the environment, not from an expression in the script. When a release for the tag exists,
       # the job keeps it. --verify-tag refuses to create the release when the tag is missing.
-      - name: Create the draft release with the package attached
+      - name: Create the draft release with the signed files attached
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -147,4 +173,4 @@ jobs:
             echo "A release for ${TAG} exists. Nothing to create."
             exit 0
           fi
-          gh release create "${TAG}" dist-package/*.tgz --draft --verify-tag --generate-notes --title "${TAG}"
+          gh release create "${TAG}" release-assets/* --draft --verify-tag --generate-notes --title "${TAG}"
