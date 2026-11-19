@@ -22,8 +22,8 @@ API reference: <https://cairn-proofs.github.io/oscal-bindings-typescript/>
 
 ## Installation
 
-[!IMPORTANT]
-**Beta.** The binding reads, checks, and writes OSCAL JSON and OSCAL YAML. It has no stability guarantees, and its API can change without notice.
+> [!IMPORTANT]
+> **Beta.** The binding reads, checks, and writes OSCAL JSON and OSCAL YAML. It has no stability guarantees, and its API can change without notice.
 
 ```sh
 npm install oscal-bindings
