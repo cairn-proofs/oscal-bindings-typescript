@@ -38,8 +38,9 @@ A maintainer reviews the draft and publishes it. The workflow `.github/workflows
 from the release, verifies its signature and its name and version, and publishes those exact bytes to npm with trusted
 publishing. The workflow never builds the package, so the file on npm is the file that passed the gate.
 The same CI run builds the API reference after the gate passes, zips it, and signs the zip with the tarball. The zip is
-attached to the draft release. The workflow `.github/workflows/docs.yml` runs when the release is published. It downloads
-the zip, verifies its signature, and deploys those files to GitHub Pages. It never builds the site. A maintainer can run
-that workflow by hand to deploy the first site or to repeat a failed deploy. The run starts from the tag, for example
+attached to the draft release. After the publish to npm succeeds, `release.yml` calls `.github/workflows/docs.yml`. It
+downloads the zip, verifies its signature, and deploys those files to GitHub Pages. It never builds the site. A failed
+publish gives no deploy, so the site never describes a version that npm does not have. A maintainer can run the docs
+workflow by hand to deploy again or to repeat a failed deploy. The run starts from the tag, for example
 `gh workflow run docs.yml --ref v<version> -f tag=v<version>`, because the environment `github-pages` allows only the
 tags `v*`.

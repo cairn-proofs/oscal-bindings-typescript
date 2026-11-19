@@ -1,6 +1,6 @@
 {
   "name": "oscal-bindings",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Typed TypeScript data bindings for OSCAL, generated from the NIST JSON Schema and the oscal-bindings-specs naming manifest.",
   "license": "Apache-2.0",
   "repository": {
