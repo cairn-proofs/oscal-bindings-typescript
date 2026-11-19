@@ -1,11 +1,13 @@
 name: Docs
-# Publishing a release builds the API reference of its tag and deploys it to GitHub Pages. A maintainer can run the
-# workflow by hand, for the first deploy or to repeat a failed one. Start the manual run from the tag, for example
-# `gh workflow run docs.yml --ref v<version> -f tag=v<version>`. The first step fails the run unless the run ref is the tag v*
-# that the release or the input names. The environment github-pages must allow only the tags v*.
-# The job has pages: write and id-token: write, so it runs only code that a lock records: the toolchain of mise.lock and
-# the packages of api-docs/package-lock.json. It does not run the check gate, because the CI run of the commit on main
-# already ran it.
+# Publishing a release deploys the API reference of its tag to GitHub Pages. build.yml built the site after the check
+# gate passed, signed the zip of the site, and attached the zip to the draft release. This workflow downloads that
+# file, verifies its signature, and deploys those exact files. It never builds the site.
+# A maintainer can run the workflow by hand, for the first deploy or to repeat a failed one. Start the manual run from
+# the tag, for example `gh workflow run docs.yml --ref v<version> -f tag=v<version>`. The first step fails the run
+# unless the run ref is the tag v* that the release or the input names. The environment github-pages must allow only
+# the tags v*.
+# The job has pages: write and id-token: write, so it runs no code from the repository. It checks out nothing and
+# installs nothing.
 on:
   release:
     types: [published]
@@ -32,7 +34,7 @@ jobs:
       group: pages
       cancel-in-progress: false
     steps:
-      # The run is on a tag v*, and the tag that the job builds is the tag of the run. The values come from the
+      # The run is on a tag v*, and the tag that the job deploys is the tag of the run. The values come from the
       # environment, not from an expression in the script.
       - name: Check the run ref
         env:
@@ -42,34 +44,37 @@ jobs:
             echo "The run ref ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME} is not the tag ${TAG}, or the tag does not start with v." >&2
             exit 1
           fi
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
-          fetch-depth: 0
-          persist-credentials: false
-      # The tagged commit is on main, as release.yml requires for a publish.
-      - name: Check the tag
+      - name: Download the API reference
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" -D dist/ --pattern "api-docs.zip"
+      # Refuse a file that the attest job of build.yml did not sign for this tag. The signer workflow and the source ref
+      # are fixed here, and the job does not read them from the release. The source digest is the commit that the tag
+      # points to now, so a tag that moved after the build fails here.
+      - name: Verify the build provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
-          if ! git merge-base --is-ancestor HEAD origin/main; then
-            echo "The tagged commit is not on main." >&2
+          digest="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq .sha)"
+          if ! [[ "${digest}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Could not resolve the tag ${TAG} to a commit." >&2
             exit 1
           fi
-      # The cache is off. mise does not install again a tool that a restored cache holds.
-      - name: Install toolchain (mise)
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
-        with:
-          version: 2026.9.15
-          cache: false
-      - name: Install dependencies
-        run: npm ci
-      - name: Build the API reference
-        run: npm run docs
-      - name: Check the site
-        run: test -f api-docs/site/index.html
+          gh attestation verify dist/api-docs.zip \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/build.yml" \
+            --source-ref "refs/tags/${TAG}" \
+            --source-digest "${digest}"
+      - name: Unzip the API reference
+        run: |
+          unzip -q dist/api-docs.zip -d site/
+          test -f site/index.html
       - name: Upload the Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
         with:
-          path: api-docs/site/
+          path: site/
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1
