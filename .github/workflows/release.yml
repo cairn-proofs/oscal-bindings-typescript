@@ -1,15 +1,38 @@
 name: Release
-# Publishes the package to npm when a maintainer pushes a version tag, for example v0.1.0. It uses npm trusted
-# publishing (OpenID Connect), so the repository holds no npm token. npm adds a provenance attestation to the release.
-# This job has id-token: write, so it runs only code that a lock records: the toolchain of mise.lock and the packages of
-# package-lock.json. It does not run the check gate, because the CI run of the commit on main already ran it.
+# Pushing a version tag, for example v0.1.0, creates a draft GitHub release. Publishing that release publishes the package
+# to npm. It uses npm trusted publishing (OpenID Connect), so the repository holds no npm token. npm adds a provenance
+# attestation to the release.
+# The publish job has id-token: write, so it runs only code that a lock records: the toolchain of mise.lock and the
+# packages of package-lock.json. It does not run the check gate, because the CI run of the commit on main already ran it.
 on:
   push:
     tags: ["v*"]
+  release:
+    types: [published]
 permissions:
   contents: read
 jobs:
+  draft:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      # When a release for the tag exists, the job keeps it. The tag comes from the environment, not from an
+      # expression in the script.
+      - name: Create a draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "A release for ${GITHUB_REF_NAME} exists. Nothing to create."
+            exit 0
+          fi
+          gh release create "${GITHUB_REF_NAME}" --draft --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
   publish:
+    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm
