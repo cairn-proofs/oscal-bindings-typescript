@@ -21,7 +21,7 @@ context: |
    If you find an edge case or ambiguity that seems to justify extending the scope, stop and seek clarification. 
   Discussion during exploration may raise questions or considerations that are ruled out. Do not include those in
    the artifacts. Future readers will not understand answers to questions that were never asked.
-  Always propose, spec, and design the smallest, simplest change that solves the problem at hand.
+  Always propose, spec, and design the smallest, simplest change that delivers a durable solution to the problem at hand.
   When it seems like a requirement or scenario needs an extension or exception, first ask if the problem is better
    solved by eliminating the requirement or scenario.
   User time and tokens are constrained resources. Do not waste them on trivial matters. If you're inclined to qualify
@@ -52,3 +52,5 @@ rules:
       Scenarios in a requirement can't be renamed in place or removed. Such changes must be made manually in a post-archive step.
     - >-
       Place new requirements to minimize inter-spec dependencies when practical and appropriate.
+    - >-
+      Specs MUST NOT change behavior defined by the contract in the upstream store `oscal-bindings-specs`.      
