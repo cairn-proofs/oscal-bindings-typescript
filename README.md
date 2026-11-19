@@ -74,9 +74,6 @@ What exists:
   except the generated model types. `test/traceability.test.ts` checks the record against the JSON Schema and the
   requirement index of the pinned spec artifact. A test also compares the record with the exports of the entry point.
 
-What does not exist:
-
-- A published npm package
 
 ## Limits
 
@@ -303,12 +300,14 @@ lockfile, a new install can take such a release.
 **What you lose.** Your process and your data can come under the control of an attacker. You cannot trust the results of
 the schema check.
 
-**What to do.** The binding has no published npm package yet. Use these steps for your current install method.
+**What to do.** Install the npm package `oscal-bindings` from the repository
+[cairn-proofs/oscal-bindings-typescript](https://github.com/cairn-proofs/oscal-bindings-typescript).
 
-1. Pin the binding to a full commit SHA or to a signed tag. Do not use a branch name.
+1. Pin an exact version of `oscal-bindings`. Do not use a range.
 2. Commit your own lockfile.
 3. Install with `npm ci --ignore-scripts`.
-4. Run `npm audit signatures`.
+4. Run `npm audit signatures`. It checks the provenance attestation of each release that the release workflow of the
+   repository published. Version 0.1.0 was published by hand and has no attestation. Use 0.2.0 or later.
 5. Review each change in `ajv`, `ajv-formats`, `yaml`, and their dependencies when you update.
 
 ## Development
