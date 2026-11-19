@@ -1,0 +1,15 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["../src/v1/index.ts"],
+  "tsconfig": "../tsconfig.build.json",
+  "out": "site",
+  "name": "oscal-bindings",
+  "readme": "none",
+  "treatWarningsAsErrors": true,
+  "treatValidationWarningsAsErrors": true,
+  "validation": {
+    "notExported": true,
+    "invalidLink": true,
+    "notDocumented": false
+  }
+}
