@@ -6,8 +6,8 @@ name: Docs
 # can also run the workflow by hand, to deploy again or to repeat a failed deploy. Start the manual run from the tag,
 # for example `gh workflow run docs.yml --ref v<version> -f tag=v<version>`. The first step fails the run unless the
 # run ref is the tag v* that the input names. The environment github-pages must allow only the tags v*.
-# The job has pages: write and id-token: write, so it runs no code from the repository. It checks out nothing and
-# installs nothing.
+# The package job checks out nothing, installs nothing and has contents: read only. The deploy job has pages: write and
+# id-token: write and runs only deploy-pages, so it runs no code from the repository.
 on:
   workflow_call:
     inputs:
@@ -24,19 +24,14 @@ on:
 permissions:
   contents: read
 jobs:
-  deploy:
+  # Verifies the signed zip and uploads it as the Pages artifact. It has no Pages or OIDC permission. It is a separate
+  # job from the deploy job, because deploy-pages looks up the artifact right after the upload, and in one job that
+  # lookup can come back empty for an artifact that was finalized a moment earlier (actions/deploy-pages#451).
+  package:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     permissions:
       contents: read
-      pages: write
-      id-token: write
-    concurrency:
-      group: pages
-      cancel-in-progress: false
     steps:
       # The run is on a tag v*, and the tag that the job deploys is the tag of the run. The values come from the
       # environment, not from an expression in the script.
@@ -79,6 +74,22 @@ jobs:
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
         with:
           path: site/
+  # Deploys the Pages artifact of the package job. It has pages: write and id-token: write and one step, so it runs no
+  # code from the repository and none from the release.
+  deploy:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1
