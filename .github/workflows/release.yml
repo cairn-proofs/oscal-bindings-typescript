@@ -1,38 +1,17 @@
 name: Release
-# Pushing a version tag, for example v0.1.0, creates a draft GitHub release. Publishing that release publishes the package
-# to npm. It uses npm trusted publishing (OpenID Connect), so the repository holds no npm token. npm adds a provenance
-# attestation to the release.
-# The publish job has id-token: write, so it runs only code that a lock records: the toolchain of mise.lock and the
-# packages of package-lock.json. It does not run the check gate, because the CI run of the commit on main already ran it.
+# Publishing a GitHub release publishes its tarball to npm. build.yml built the tarball for the tag after the check gate
+# passed, signed it, and attached it to the draft release. This workflow downloads that file, verifies its signature,
+# and publishes those exact bytes. It never builds the package. It uses npm trusted publishing (OpenID Connect), so the
+# repository holds no npm token. npm adds a provenance attestation to the release.
+# The publish job has id-token: write, so it runs only code that a lock records: the toolchain of mise.lock. It installs
+# no package.
 on:
-  push:
-    tags: ["v*"]
   release:
     types: [published]
 permissions:
   contents: read
 jobs:
-  draft:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: write
-    steps:
-      # When a release for the tag exists, the job keeps it. The tag comes from the environment, not from an
-      # expression in the script.
-      - name: Create a draft release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            echo "A release for ${GITHUB_REF_NAME} exists. Nothing to create."
-            exit 0
-          fi
-          gh release create "${GITHUB_REF_NAME}" --draft --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
   publish:
-    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm
@@ -63,12 +42,48 @@ jobs:
             echo "The tagged commit is not on main." >&2
             exit 1
           fi
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: List the files of the package
-        run: npm pack --dry-run
+      - name: Download the release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" -D dist-package/ --pattern "*.tgz"
+      # The release holds exactly one tarball. Its package.json names the package and the version of the tag. A
+      # tarball that someone swapped or edited on the release fails here.
+      - name: Verify the tarball matches the tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG#v}"
+          ls -l dist-package/
+          files=(dist-package/*.tgz)
+          if [ "${#files[@]}" -ne 1 ]; then
+            echo "The release must hold exactly one tarball." >&2
+            exit 1
+          fi
+          expected="$(node -p 'require("./package.json").name')"
+          packed="$(tar -xzOf "${files[0]}" package/package.json | node -e 'const p=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(p.name+"@"+p.version)')"
+          if [ "${packed}" != "${expected}@${version}" ]; then
+            echo "The tarball holds ${packed}, not ${expected}@${version}." >&2
+            exit 1
+          fi
+      # Refuse a file that the attest job of build.yml did not sign for this tag. The signer workflow and the source
+      # ref are fixed here, and the job does not read them from the release. The source digest is the commit that the
+      # tag points to now, so a tag that moved after the build fails here.
+      - name: Verify the build provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          digest="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq .sha)"
+          if ! [[ "${digest}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Could not resolve the tag ${TAG} to a commit." >&2
+            exit 1
+          fi
+          gh attestation verify dist-package/*.tgz \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/build.yml" \
+            --source-ref "refs/tags/${TAG}" \
+            --source-digest "${digest}"
       # npm does not let a publisher replace a version. When npm has the version, the job stops with success.
       - name: Publish
         run: |
@@ -78,4 +93,4 @@ jobs:
             echo "npm already has ${name}@${version}. Nothing to publish."
             exit 0
           fi
-          npm publish
+          npm publish "dist-package/${name}-${version}.tgz"
