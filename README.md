@@ -12,9 +12,9 @@
 Typed TypeScript data bindings for [OSCAL](https://pages.nist.gov/OSCAL/) (Open Security Controls Assessment Language) v1.2.3, generated from the NIST JSON Schema and the naming manifest of [cairn-proofs/oscal-bindings-specs](https://github.com/cairn-proofs/oscal-bindings-specs).
 
 - **Every OSCAL document type.** Catalog, Profile, Component Definition, System Security Plan, Assessment Plan, Assessment Results, Plan of Action and Milestones, and Mapping Collection, each with a typed parser.
-- **Checked input.** A parse rejects a document that does not match the schema, and reports each failing location.
+- **Strict input.** A parse rejects unknown fields and values that break an OSCAL pattern, and reports each failure with its location.
 - **JSON and YAML.** Read and write both. A YAML document gives the same result as the same document in JSON.
-- **Typed errors.** Each failure is an `OscalError` subclass that you test with `instanceof`.
+- **Measured performance.** [PERFORMANCE.md](https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/PERFORMANCE.md) has the parse, serialize, and memory costs.
 - **Three runtime dependencies.** `ajv`, `ajv-formats`, and `yaml`. One entry point, `oscal-bindings/v1`.
 - **Consistent interoperability.** The binding implements the [language-neutral OSCAL bindings spec](https://github.com/cairn-proofs/oscal-bindings-specs) and passes its conformance corpus.
 
@@ -127,7 +127,7 @@ oscal-bindings is the typed data-binding layer for one OSCAL release: types for 
 
 - [Resource limits](https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/docs/limits.md): the nesting-depth and alias-expansion limits, and the regex patterns
 - [Security notes for consumers](https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/docs/security.md): what to do around each call
-- [Performance](https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/PERFORMANCE.md): how to measure `parse` and `serialize`
+- [Performance](https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/PERFORMANCE.md): measured parse, serialize, and memory costs, and how to measure
 - API reference: <https://cairn-proofs.github.io/oscal-bindings-typescript/>
 
 ## Project information
