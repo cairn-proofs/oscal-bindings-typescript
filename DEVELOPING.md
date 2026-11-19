@@ -7,6 +7,8 @@ npm ci
 npm run check
 ```
 
+The toolchain includes `actionlint`. Run `actionlint` after a change to a file in `.github/workflows/`.
+
 The check gate downloads a pinned spec artifact release from cairn-proofs/oscal-bindings-specs over HTTPS. The pin is
 release `v0.8.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256. A change that moves the pin also sets `version` in `spec-pin.json`, which
 the spec-pin badge of the README reads. `test/spec-pin.test.ts` fails when the two differ.
@@ -28,6 +30,13 @@ the check gate.
 - A traceability record, `openspec/traceability.json`. It has one entry for each name that the entry point exports,
   except the generated model types. `test/traceability.test.ts` checks the record against the JSON Schema and the
   requirement index of the pinned spec artifact. A test also compares the record with the exports of the entry point.
+- Three consumer legs. The jobs `consumer-package` and `consumer` of `.github/workflows/build.yml` run on each push to
+  `main`, on each pull request and by hand, and not on a `v*` tag. `consumer-package` packs the tarball once. Each leg
+  installs the tarball and its TypeScript in an empty project, runs `test/consumer/check.mjs` on its Node ("Run on
+  Node"), and runs `tsc` on `test/consumer/consumer.ts` ("Type-check with TypeScript"). The legs are
+  `consumer (node 22, ts 5.9)` with Node 22.12.0, the floor of `engines`, `consumer (node 24, ts 6.0)`, and
+  `consumer (node 26, ts 7.0)`. `npm run pack:check` uses the same files in `test/consumer/`. A change to the lines of
+  a leg also changes the required checks of the ruleset "main: require PR and CI".
 
 ## Release
 A pull request sets the new `version` in `package.json`. After the merge, a maintainer tags the merge commit `v<version>`

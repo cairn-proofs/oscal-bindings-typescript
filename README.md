@@ -4,6 +4,7 @@
   <a href="https://github.com/cairn-proofs/oscal-bindings-typescript/actions/workflows/build.yml"><img alt="CI" src="https://github.com/cairn-proofs/oscal-bindings-typescript/actions/workflows/build.yml/badge.svg?branch=main"></a>
   <a href="https://www.npmjs.com/package/oscal-bindings"><img alt="npm" src="https://img.shields.io/npm/v/oscal-bindings.svg"></a>
   <a href="https://www.npmjs.com/package/oscal-bindings"><img alt="Node versions" src="https://img.shields.io/node/v/oscal-bindings.svg"></a>
+  <a href="https://www.typescriptlang.org/"><img alt="TypeScript versions" src="https://img.shields.io/badge/TypeScript-%3E%3D5.9-blue"></a>
   <a href="https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/npm/l/oscal-bindings.svg"></a>
 </p>
 
@@ -29,7 +30,7 @@ API reference: <https://cairn-proofs.github.io/oscal-bindings-typescript/>
 npm install oscal-bindings
 ```
 
-The package needs Node 26.13.0 or later. [Security notes](https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/docs/security.md#install-the-binding) covers how to pin and verify the install.
+The package needs Node 22.12.0 or later. To type-check your code against it, use TypeScript 5.9 or later. [Security notes](https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/docs/security.md#install-the-binding) covers how to pin and verify the install.
 
 ## Quick start
 
