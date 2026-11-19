@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-11-19
+# The change adds documentation and docs tooling. It adds no requirement and changes no behavior of the binding.
+skip_specs: true

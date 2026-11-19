@@ -9,3 +9,6 @@ test/types/corpus/
 .agents/tasks
 # The output of `npm run build`.
 dist/
+# The API reference that `npm run docs` builds, and the packages of its own install.
+api-docs/site/
+api-docs/node_modules/

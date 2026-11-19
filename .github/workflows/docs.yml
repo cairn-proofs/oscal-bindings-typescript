@@ -1,0 +1,63 @@
+name: Docs
+# Publishing a release builds the API reference of its tag and deploys it to GitHub Pages. A maintainer can run the
+# workflow by hand with a tag, for the first deploy or to repeat a failed one.
+# The job has pages: write and id-token: write, so it runs only code that a lock records: the toolchain of mise.lock and
+# the packages of api-docs/package-lock.json. It does not run the check gate, because the CI run of the commit on main
+# already ran it.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy, for example v0.2.0"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: refs/tags/${{ github.event.release.tag_name || inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      # The tagged commit is on main, as release.yml requires for a publish.
+      - name: Check the tag
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "The tagged commit is not on main." >&2
+            exit 1
+          fi
+      # The cache is off. mise does not install again a tool that a restored cache holds.
+      - name: Install toolchain (mise)
+        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7  # v5.2.0
+        with:
+          version: 2026.9.15
+          cache: false
+      - name: Install dependencies
+        run: npm ci
+      - name: Build the API reference
+        run: npm run docs
+      - name: Check the site
+        run: test -f api-docs/site/index.html
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: api-docs/site/
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1

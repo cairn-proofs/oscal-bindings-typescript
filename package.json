@@ -32,6 +32,7 @@
     "global-names": "tsx scripts/global-names.ts",
     "bench": "tsx scripts/benchmark.ts",
     "pack:check": "tsx scripts/pack-check.ts",
+    "docs": "npm ci --prefix api-docs && npm run build --prefix api-docs",
     "validate": "openspec validate --all --strict",
     "check": "npm run typecheck && npm run test && npm run generate:check && npm run fixtures && npm run types:check && npm run global-names && npm run pack:check && npm run validate"
   },

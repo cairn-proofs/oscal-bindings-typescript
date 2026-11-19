@@ -1,7 +1,7 @@
 /**
- * Pins each claim of the "Security notes for consumers" section of README.md. Each test states a behavior that a note
- * relies on. A test that fails means the code changed, or the README changed, so that a note can be false. Update the
- * note in README.md first, then update the test. These tests need no spec artifact and no network.
+ * Pins each claim of docs/security.md, the "Security notes for consumers". Each test states a behavior that a note
+ * relies on. A test that fails means the code changed, or the notes changed, so that a note can be false. Update the
+ * note in docs/security.md first, then update the test. These tests need no spec artifact and no network.
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -20,7 +20,9 @@ const { isValid, parse, parseFile, parseYaml, parseYamlFile } = parseModule;
 const { buildHash, buildRlink } = backmatter;
 
 const root = path.resolve(import.meta.dirname, "..");
-const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+// A leading newline lets the checks below find the title and each heading at the start of a line, as in the middle of
+// a file.
+const notes = `\n${fs.readFileSync(path.join(root, "docs", "security.md"), "utf8")}`;
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")) as {
   name: string;
   private?: boolean;
@@ -28,7 +30,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), 
   dependencies: Record<string, string>;
 };
 
-const SECTION = "## Security notes for consumers";
+const SECTION = "# Security notes for consumers";
 const NOTES = [
   "Size and time",
   "Error text",
@@ -44,7 +46,7 @@ const NOTES = [
 
 /** The failure message of a pinning test. It tells the author which note to revise. */
 const stale = (note: string) =>
-  `The behavior that the README note "${note}" describes has changed. Revise that note, then update this test.`;
+  `The behavior that the note "${note}" describes has changed. Revise that note, then update this test.`;
 
 const catalog = (overrides: Record<string, unknown> = {}) => ({
   catalog: {
@@ -71,10 +73,10 @@ const sourceFiles = fs
     text: withoutComments(fs.readFileSync(path.join(root, "src", entry.name), "utf8")),
   }));
 
-test("the README holds the security notes section and each of its notes", () => {
-  assert.ok(readme.includes(`\n${SECTION}\n`), `README.md has no "${SECTION}" section.`);
+test("docs/security.md holds the security notes title and each of its notes", () => {
+  assert.ok(notes.includes(`\n${SECTION}\n`), `docs/security.md has no "${SECTION}" title.`);
   for (const note of NOTES) {
-    assert.ok(readme.includes(`\n#### ${note}\n`), `README.md has no "${note}" note. Update NOTES in this test.`);
+    assert.ok(notes.includes(`\n### ${note}\n`), `docs/security.md has no "${note}" note. Update NOTES in this test.`);
   }
 });
 
@@ -96,9 +98,9 @@ test("each operation that the notes name exists", async () => {
     "NotFoundError",
     "ReadError",
   ];
-  const section = readme.slice(readme.indexOf(SECTION));
+  const section = notes.slice(notes.indexOf(SECTION));
   for (const name of names) {
-    assert.ok(name in exported, `${name} is not exported. Revise the README notes that name it.`);
+    assert.ok(name in exported, `${name} is not exported. Revise the notes that name it.`);
     assert.ok(section.includes(`\`${name}`), `The security notes no longer name ${name}. Update the names in this test.`);
   }
   assert.equal(typeof OscalDoc.fromJson, "function");
