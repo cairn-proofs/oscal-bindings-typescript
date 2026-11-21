@@ -6,10 +6,10 @@ import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
 import type { CatalogDocument } from "../src/generated/oscal.ts";
 import { parse } from "../src/parse.ts";
 import { serialize } from "../src/serialize.ts";
-import { loadCorpus } from "./support/runner.ts";
+import { loadCorpus, withoutExpectedFailures } from "./support/runner.ts";
 
 const paths = artifactPaths(await ensureSpecArtifact());
-const roundTripCases = loadCorpus(paths.corpus).cases.filter((c) => c.operation === "round-trip");
+const roundTripCases = withoutExpectedFailures(loadCorpus(paths.corpus).cases).filter((c) => c.operation === "round-trip");
 const documents = roundTripCases.map((c) => ({
   id: c.id,
   document: parse(fs.readFileSync(path.join(paths.corpus, c.input))),

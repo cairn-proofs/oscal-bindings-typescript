@@ -4,7 +4,7 @@ import path from "node:path";
 import { before, test } from "node:test";
 import { type Json, type Manifest, resolvePointer } from "../scripts/manifest.ts";
 import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
-import { loadCorpus } from "./support/runner.ts";
+import { loadCorpus, withoutExpectedFailures } from "./support/runner.ts";
 
 type Validators = typeof import("../src/validators.ts");
 
@@ -64,7 +64,7 @@ test("the element-type names are unique, and each maps back to its canonical typ
 });
 
 test("each validator of a corpus element gives the validity result of its case", () => {
-  const cases = loadCorpus(paths.corpus).cases.filter(
+  const cases = withoutExpectedFailures(loadCorpus(paths.corpus).cases).filter(
     (c) => c.operation === "validate-element" && c["expected-valid"] !== undefined,
   );
   assert.ok(cases.length > 0, "the corpus has no validate-element case with expected-valid");

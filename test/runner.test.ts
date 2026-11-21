@@ -5,7 +5,15 @@ import path from "node:path";
 import { test } from "node:test";
 import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
 import type { Adapter, FacadeView } from "./support/adapter.ts";
-import { checkListedIds, isPendingCase, loadCorpus, runCase, runWithExpectation, type Case } from "./support/runner.ts";
+import {
+  checkListedIds,
+  isPendingCase,
+  loadCorpus,
+  runCase,
+  runWithExpectation,
+  unofferedReason,
+  type Case,
+} from "./support/runner.ts";
 
 const corpus = loadCorpus(artifactPaths(await ensureSpecArtifact()).corpus);
 
@@ -19,8 +27,14 @@ class FakeError extends Error {
   }
 }
 
+/** The category tree of ERR-009: the only parent is parse-error, the parent of document-type-mismatch. */
+const inTree = (own: string, category: string) =>
+  category === own || (own === "document-type-mismatch" && category === "parse-error");
+
 /** An adapter that answers from the corpus data of one case, so the case passes. */
 function conforming(c: Case): Adapter {
+  /** The one document that each parse of a passing case returns. The serializer gives the expected JSON for it only. */
+  const marker = { marker: true };
   const fail = (): never => {
     throw new FakeError(c["expected-category"] as string, c["expected-min-failures"] ?? 1, `fails at ${path.join(corpus.dir, c.input)}`);
   };
@@ -42,15 +56,16 @@ function conforming(c: Case): Adapter {
     return generated ? { ...element, uuid: randomUUID() } : element;
   };
   return {
-    parse: () => (c.operation === "parse" || c.operation === "yaml-parse" ? fail() : {}),
+    parse: () => (c.operation === "parse" ? fail() : marker),
     parseTyped: () => (c.operation === "parse-typed" ? fail() : {}),
-    parseFile: fail,
-    serialize: () => expectedJson(),
+    parseFile: () => (c.operation === "parse-file" ? fail() : marker),
+    parseYamlFile: () => (c.operation === "yaml-parse-file" ? fail() : marker),
+    serialize: (document) => (document === marker ? expectedJson() : "{}"),
     isValid: () => c.operation !== "parse",
     validateElement: () => (throwing ? fail() : (c["expected-valid"] as boolean)),
     elementTypes: () => JSON.parse(expectedJson()) as string[],
-    assessmentPeriod: () => (throwing ? fail() : (c["expected-period"] as { start: string; end: string })),
-    parseYaml: () => (c.operation === "yaml-parse" ? fail() : {}),
+    assessmentPeriod: () => (throwing ? fail() : (c["expected-period"] as { start: string | null; end: string | null })),
+    parseYaml: () => (c.operation === "yaml-parse" ? fail() : marker),
     serializeYaml: () => "",
     facade: view,
     facadeFromBytes: view,
@@ -59,6 +74,7 @@ function conforming(c: Case): Adapter {
     buildRlink: build,
     buildResource: build,
     category: (error) => (error as FakeError).category,
+    inCategory: (error, category) => inTree((error as FakeError).category, category),
     failureCount: (error) => (error as FakeError).count,
   };
 }
@@ -69,7 +85,7 @@ const firstOf = (operation: string, where: (c: Case) => boolean = () => true) =>
   corpus.cases.find((c) => c.operation === operation && where(c)) as Case;
 
 test("each case passes with the conforming fake adapter", () => {
-  for (const c of corpus.cases) if (!isPendingCase(c)) runCase(conforming(c), corpus.dir, c);
+  for (const c of corpus.cases) if (!isPendingCase(c) && unofferedReason(c) === undefined) runCase(conforming(c), corpus.dir, c);
 });
 
 test("a pending case is one that runCase does not know yet", () => {
@@ -289,6 +305,56 @@ const changes: Array<[string, Case, (a: Adapter, c: Case) => Partial<Adapter>]> 
       },
     }),
   ],
+  [
+    "yaml-parse-file: no error",
+    firstOf("yaml-parse-file"),
+    (a) => ({ parseYamlFile: () => a.parseYaml("") }),
+  ],
+  ["yaml-parse-file: wrong category", firstOf("yaml-parse-file"), () => ({ category: () => "other" })],
+  [
+    "yaml-parse-file: message lacks the path",
+    firstOf("yaml-parse-file"),
+    () => ({
+      parseYamlFile: () => {
+        throw new FakeError("not-found", 1, "no such file");
+      },
+    }),
+  ],
+  [
+    "assessment-period: a datetime for an empty bound",
+    byId("assessment-period/at-frequency-only"),
+    () => ({ assessmentPeriod: () => ({ start: "2026-03-01T00:00:00Z", end: null }) }),
+  ],
+  [
+    "round-trip: parseFile returns another document",
+    byId("round-trip/catalog-path"),
+    () => ({ parseFile: () => ({}) }),
+  ],
+  [
+    "yaml-round-trip: parseYamlFile returns another document",
+    byId("yaml-round-trip/profile-path"),
+    () => ({ parseYamlFile: () => ({}) }),
+  ],
+  [
+    "yaml-round-trip: serializeYaml writes an empty value for an absent key",
+    byId("yaml-round-trip/minimal-catalog"),
+    () => ({ serializeYaml: () => "catalog:\n  metadata:\n    remarks: ''\n" }),
+  ],
+  [
+    "category tree: parse-error is also in document-type-mismatch",
+    byId("parse/not-json"),
+    (a) => ({ inCategory: (e, category) => category === "document-type-mismatch" || a.inCategory(e, category) }),
+  ],
+  [
+    "category tree: parse-error is not in parse-error",
+    byId("parse/not-json"),
+    (a) => ({ inCategory: (e, category) => category !== "parse-error" && a.inCategory(e, category) }),
+  ],
+  [
+    "category tree: document-type-mismatch is not in parse-error",
+    byId("parse-typed/wrong-document-type"),
+    (a) => ({ inCategory: (e, category) => category !== "parse-error" && a.inCategory(e, category) }),
+  ],
   ["yaml-parse: no error", firstOf("yaml-parse"), () => ({ parseYaml: () => ({}) })],
   ["yaml-parse: wrong category", firstOf("yaml-parse"), () => ({ category: () => "other" })],
 ];
@@ -308,17 +374,85 @@ test("the runner normalizes a bound of an assessment period before it compares t
   runCase({ ...base, assessmentPeriod: () => ({ ...(c["expected-period"] as { start: string; end: string }), start }) }, corpus.dir, c);
 });
 
-test("a case of the corpus has the bytes input form that the runner passes as bytes", () => {
-  const c = corpus.cases.find((x) => x["input-form"] === "bytes") as Case;
+test("a parse case of the bytes input form gives raw bytes to the parser", () => {
+  const c = firstOf("parse", (x) => x["input-form"] === "bytes");
   let seen: unknown;
   const base = conforming(c);
   assert.throws(() =>
-    runCase({ ...base, parse: (i) => ((seen = i), base.parse(i)), parseYaml: (i) => ((seen = i), base.parseYaml(i)) }, corpus.dir, {
-      ...c,
-      "expected-category": "other",
-    }),
+    runCase({ ...base, parse: (i) => ((seen = i), base.parse(i)) }, corpus.dir, { ...c, "expected-category": "other" }),
   );
   assert.ok(seen instanceof Uint8Array);
+});
+
+test("round-trip/catalog-path gives the path of the input to parseFile", () => {
+  const c = byId("round-trip/catalog-path");
+  const seen: string[] = [];
+  const base = conforming(c);
+  runCase({ ...base, parseFile: (p) => (seen.push(p), base.parseFile(p)) }, corpus.dir, c);
+  assert.deepEqual(seen, [path.join(corpus.dir, c.input)]);
+});
+
+test("round-trip/catalog-bytes gives bytes to the generic parser and the validity check, and text to the typed parser", () => {
+  const c = byId("round-trip/catalog-bytes");
+  const seen: Record<string, unknown> = {};
+  const base = conforming(c);
+  runCase(
+    {
+      ...base,
+      parse: (i) => ((seen.parse = i), base.parse(i)),
+      isValid: (i) => ((seen.isValid = i), base.isValid(i)),
+      parseTyped: (t, i) => ((seen.parseTyped = i), base.parseTyped(t, i)),
+    },
+    corpus.dir,
+    c,
+  );
+  assert.ok(seen.parse instanceof Uint8Array);
+  assert.ok(seen.isValid instanceof Uint8Array);
+  assert.equal(typeof seen.parseTyped, "string");
+});
+
+test("yaml-round-trip/profile-path gives the input path, and then a file with the serialized YAML", () => {
+  const c = byId("yaml-round-trip/profile-path");
+  const calls: Array<{ path: string; content: string | undefined }> = [];
+  const base = conforming(c);
+  runCase(
+    {
+      ...base,
+      serializeYaml: () => "profile: {}\n",
+      parseYamlFile: (p) => {
+        calls.push({ path: p, content: fs.existsSync(p) ? fs.readFileSync(p, "utf8") : undefined });
+        return base.parseYamlFile(p);
+      },
+    },
+    corpus.dir,
+    c,
+  );
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].path, path.join(corpus.dir, c.input));
+  assert.notEqual(calls[1].path, calls[0].path);
+  assert.equal(calls[1].content, "profile: {}\n");
+  assert.equal(fs.existsSync(calls[1].path), false, "the runner removes the temporary file");
+});
+
+test("yaml-round-trip/catalog-bytes gives bytes to both parses, and the second holds the serialized YAML", () => {
+  const c = byId("yaml-round-trip/catalog-bytes");
+  const seen: unknown[] = [];
+  const base = conforming(c);
+  runCase(
+    { ...base, serializeYaml: () => "catalog: {}\n", parseYaml: (i) => (seen.push(i), base.parseYaml(i)) },
+    corpus.dir,
+    c,
+  );
+  assert.equal(seen.length, 2);
+  assert.ok(seen[0] instanceof Uint8Array);
+  assert.ok(seen[1] instanceof Uint8Array);
+  assert.deepEqual(seen[1], new TextEncoder().encode("catalog: {}\n"));
+});
+
+test("the runner skips each case of an operation that the binding does not offer", () => {
+  const c = byId("yaml-parse-typed/wrong-document-type");
+  assert.match(unofferedReason(c) as string, /typed YAML parser/);
+  assert.equal(unofferedReason(byId("yaml-parse/syntax-error")), undefined);
 });
 
 test("the facade case of the bytes input form gives raw bytes to the facade", () => {

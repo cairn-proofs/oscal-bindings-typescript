@@ -10,7 +10,7 @@ npm run check
 The toolchain includes `actionlint`. Run `actionlint` after a change to a file in `.github/workflows/`.
 
 The check gate downloads a pinned spec artifact release from cairn-proofs/oscal-bindings-specs over HTTPS. The pin is
-release `v0.8.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256. A change that moves the pin also sets `version` in `spec-pin.json`, which
+release `v0.9.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256. A change that moves the pin also sets `version` in `spec-pin.json`, which
 the spec-pin badge of the README reads. `test/spec-pin.test.ts` fails when the two differ.
 ## API reference
 `npm run docs` builds the API reference with TypeDoc into `api-docs/site/`. TypeDoc does not support the TypeScript 7 of
@@ -21,12 +21,15 @@ the check gate.
 
 ## How the binding is checked
 - A conformance runner. It runs each case of `corpus/1.2.3/cases.json` as one test, with the case id as the test name.
-  The cases of parsing, the `round-trip` cases, the `yaml-parse` and `yaml-round-trip` cases, the `element/*` cases, the
-  `element-types` case, the `facade` cases, the `assessment-period` cases, and the `build-hash`, `build-rlink`, and
-  `build-resource` cases pass.
-  `test/conformance/expected-failures.json` lists each case that needs an operation that does not exist yet. A listed
-  case that passes fails the run, and so does a listed id that is not in the corpus. A change that adds an operation
-  connects it in `test/support/adapter.ts` and removes the cases that it fixes from the list.
+  The cases of parsing, the `round-trip` cases, the `yaml-parse`, `yaml-parse-file` and `yaml-round-trip` cases, the
+  `element/*` cases, the `element-types` case, the `facade` cases, the `assessment-period` cases, and the `build-hash`,
+  `build-rlink`, and `build-resource` cases pass, except the cases that `expected-failures.json` lists.
+  The runner skips `yaml-parse-typed`. The binding offers no typed YAML parser, and the corpus README tells a binding
+  to skip the operation when YAML is optional for its typed parsers (YML-007).
+  `test/conformance/expected-failures.json` lists each case that the binding does not pass yet, with the issue that
+  owns it as the reason. A listed case that passes fails the run, and so does a listed id that is not in the corpus.
+  The unit tests that read corpus inputs directly do not use a listed case. A change that fixes a case removes its
+  entry from the list.
 - A traceability record, `openspec/traceability.json`. It has one entry for each name that the entry point exports,
   except the generated model types. `test/traceability.test.ts` checks the record against the JSON Schema and the
   requirement index of the pinned spec artifact. A test also compares the record with the exports of the entry point.
@@ -42,7 +45,9 @@ the check gate.
 A pull request sets the new `version` in `package.json`. After the merge, a maintainer tags the merge commit `v<version>`
 and pushes the tag. The CI workflow `.github/workflows/build.yml` then runs the check gate on the tag. When the gate
 passes, it builds the package tarball once, signs its build provenance, and attaches it to a draft GitHub release. The
-workflow fails early when the tag is not `v<version>`, or when the tagged commit is not on `main`.
+workflow fails early when the tag is not `v<version>`, when the tagged commit is not on `main`, or when
+`test/conformance/expected-failures.json` has an entry. `README.md` states that the binding passes the conformance
+corpus, so a release cannot have a listed case.
 A maintainer reviews the draft and publishes it. The workflow `.github/workflows/release.yml` then downloads the tarball
 from the release, verifies its signature and its name and version, and publishes those exact bytes to npm with trusted
 publishing. The workflow never builds the package, so the file on npm is the file that passed the gate.
