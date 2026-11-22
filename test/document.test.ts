@@ -9,10 +9,11 @@ import { NotFoundError, ParseError } from "../src/errors.ts";
 import type { OscalDocument } from "../src/generated/oscal.ts";
 import { parse } from "../src/parse.ts";
 import { rootKeys } from "../src/validators.ts";
-import { type Case, loadCorpus } from "./support/runner.ts";
+import { type Case, loadCorpus, withoutExpectedFailures } from "./support/runner.ts";
 
 const paths = artifactPaths(await ensureSpecArtifact());
-const cases = loadCorpus(paths.corpus).cases;
+// A case that expected-failures.json lists is not read here. Its entry is removed when the case passes (VER-007).
+const cases = withoutExpectedFailures(loadCorpus(paths.corpus).cases);
 const read = (c: Case) => fs.readFileSync(path.join(paths.corpus, c.input));
 
 /** The valid corpus documents: the inputs of the round-trip cases. */

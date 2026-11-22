@@ -4,7 +4,9 @@
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { parse as parseGenericYaml } from "yaml";
 import type { Adapter } from "./adapter.ts";
 import { canonicalize, normalizeDatetime } from "./canonical-json.ts";
 
@@ -21,7 +23,8 @@ export interface Case {
   "expected-min-failures"?: number;
   "expected-max-failures"?: number;
   arguments?: Record<string, unknown>;
-  "expected-period"?: { start: string; end: string };
+  "expected-period"?: { start: string | null; end: string | null };
+  "expected-absent-keys"?: string[];
   "expected-uuid"?: string;
   "expected-element"?: unknown;
 }
@@ -42,6 +45,9 @@ function inputOf(corpusDir: string, c: Case): string | Uint8Array {
   const bytes = fs.readFileSync(path.join(corpusDir, c.input));
   return c["input-form"] === "bytes" ? new Uint8Array(bytes) : bytes.toString("utf8");
 }
+
+/** The input of a case as UTF-8 text, whatever its input form. */
+const textOf = (corpusDir: string, c: Case): string => fs.readFileSync(path.join(corpusDir, c.input), "utf8");
 
 /** The canonical bytes of JSON text. */
 const canonicalBytes = (json: string) => Buffer.from(canonicalize(json), "utf8");
@@ -72,8 +78,20 @@ function uuidPattern(corpusDir: string): RegExp {
   return new RegExp(schema.definitions.UUIDDatatype.pattern);
 }
 
-/** Runs `action`, which must throw an error of category `category`. Returns that error. */
-function reports(adapter: Adapter, c: Case, category: string, action: () => unknown): unknown {
+/** The only parent in the category tree of ERR-009, as the corpus README states it. */
+const PARENT_CATEGORY: Readonly<Record<string, string>> = { "document-type-mismatch": "parse-error" };
+
+/** The categories of the corpus (cases.json, `categories`). */
+function categoriesOf(corpusDir: string): string[] {
+  const index = JSON.parse(fs.readFileSync(path.join(corpusDir, "cases.json"), "utf8")) as { categories: string[] };
+  return index.categories;
+}
+
+/**
+ * Runs `action`, which must throw an error of category `category`. Returns that error. The error is in `category` and
+ * in its ancestor, and in no other category of the corpus (ERR-009).
+ */
+function reportsIn(corpusDir: string, adapter: Adapter, c: Case, category: string, action: () => unknown): unknown {
   let error: unknown;
   try {
     action();
@@ -82,6 +100,10 @@ function reports(adapter: Adapter, c: Case, category: string, action: () => unkn
   }
   assert.ok(error !== undefined, `${c.id}: expected the category ${category}, but the operation did not throw`);
   assert.equal(adapter.category(error), category, `${c.id}: wrong category`);
+  for (const other of categoriesOf(corpusDir)) {
+    const expectedIn = other === category || other === PARENT_CATEGORY[category];
+    assert.equal(adapter.inCategory(error, other), expectedIn, `${c.id}: wrong test result for the category ${other}`);
+  }
   return error;
 }
 
@@ -105,16 +127,59 @@ export function isPendingCase(c: Case): boolean {
   return PENDING_OPERATIONS.has(c.operation);
 }
 
+/**
+ * The operations of the corpus that the binding does not offer, with the reason. The corpus README tells a binding to
+ * skip such an operation.
+ */
+export const UNOFFERED_OPERATIONS: ReadonlyMap<string, string> = new Map([
+  ["yaml-parse-typed", "the binding offers no typed YAML parser, and YML-007 makes these parsers optional"],
+]);
+
+/** The reason that the binding skips the operation of the case, or undefined when it offers the operation. */
+export const unofferedReason = (c: Case): string | undefined => UNOFFERED_OPERATIONS.get(c.operation);
+
+/** Writes `text` to a file in a new temporary directory, runs `action` with the path, and removes the directory. */
+function withTempFile<T>(text: string, action: (file: string) => T): T {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "oscal-runner-"));
+  try {
+    const file = path.join(dir, "second-parse.yaml");
+    fs.writeFileSync(file, text);
+    return action(file);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** The first mapping key of `keys` that occurs at any depth of a YAML value, or undefined. */
+function findKey(value: unknown, keys: readonly string[]): string | undefined {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findKey(item, keys);
+      if (found !== undefined) return found;
+    }
+  } else if (typeof value === "object" && value !== null) {
+    for (const [key, item] of Object.entries(value)) {
+      if (keys.includes(key)) return key;
+      const found = findKey(item, keys);
+      if (found !== undefined) return found;
+    }
+  }
+  return undefined;
+}
+
 /** Runs one corpus case through the adapter. Throws when the binding does not give the expected result. */
 export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
   const category = c["expected-category"] as string;
+  const reports = (a: Adapter, cc: Case, cat: string, action: () => unknown) => reportsIn(corpusDir, a, cc, cat, action);
   switch (c.operation) {
     case "round-trip": {
+      const text = textOf(corpusDir, c);
+      const fromPath = c["input-form"] === "path";
       const input = inputOf(corpusDir, c);
-      const document = adapter.parse(input);
-      adapter.parseTyped(c["document-type"] as string, input);
+      const document = fromPath ? adapter.parseFile(path.join(corpusDir, c.input)) : adapter.parse(input);
+      adapter.parseTyped(c["document-type"] as string, text);
       assertCanonicalEqual(corpusDir, c, adapter.serialize(document), "the serialized document");
-      assert.equal(adapter.isValid(input), true, `${c.id}: isValid must be true`);
+      assert.equal(adapter.isValid(fromPath ? text : input), true, `${c.id}: isValid must be true`);
       return;
     }
     case "parse": {
@@ -145,6 +210,10 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
       const period = adapter.assessmentPeriod(document);
       for (const bound of ["start", "end"] as const) {
         const value = period[bound];
+        if (expected[bound] === null) {
+          assert.ok(value === undefined || value === null, `${c.id}: the ${bound} of the period is not empty`);
+          continue;
+        }
         assert.equal(typeof value, "string", `${c.id}: the ${bound} of the period is not a string`);
         assert.equal(normalizeDatetime(value as string), expected[bound], `${c.id}: wrong ${bound}`);
       }
@@ -221,10 +290,27 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
       return;
     }
     case "yaml-round-trip": {
-      const document = adapter.parseYaml(inputOf(corpusDir, c));
+      const form = c["input-form"];
+      const document =
+        form === "path" ? adapter.parseYamlFile(path.join(corpusDir, c.input)) : adapter.parseYaml(inputOf(corpusDir, c));
       assertCanonicalEqual(corpusDir, c, adapter.serialize(document), "the parsed YAML");
-      const again = adapter.parseYaml(adapter.serializeYaml(document));
-      assertCanonicalEqual(corpusDir, c, adapter.serialize(again), "the YAML output parsed again");
+      const yaml = adapter.serializeYaml(document);
+      const parseAgain = (): unknown =>
+        form === "path"
+          ? withTempFile(yaml, (file) => adapter.parseYamlFile(file))
+          : adapter.parseYaml(form === "bytes" ? new TextEncoder().encode(yaml) : yaml);
+      assertCanonicalEqual(corpusDir, c, adapter.serialize(parseAgain()), "the YAML output parsed again");
+      const absent = c["expected-absent-keys"];
+      if (absent !== undefined) {
+        const found = findKey(parseGenericYaml(yaml), absent);
+        assert.equal(found, undefined, `${c.id}: the serialized YAML has the key ${found}`);
+      }
+      return;
+    }
+    case "yaml-parse-file": {
+      const file = path.join(corpusDir, c.input);
+      const error = reports(adapter, c, category, () => adapter.parseYamlFile(file));
+      assertNamesPath(c, error, file);
       return;
     }
     case "yaml-parse": {
@@ -240,6 +326,14 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
 
 /** A map from case id to the reason that the case is expected to fail (VER-007). */
 export type ExpectedFailures = Record<string, string>;
+
+/** The parsed `expected-failures.json` of the binding (VER-007). */
+export const EXPECTED_FAILURES: ExpectedFailures = JSON.parse(
+  fs.readFileSync(new URL("../conformance/expected-failures.json", import.meta.url), "utf8"),
+) as ExpectedFailures;
+
+/** The cases that `expected-failures.json` does not list. Tests that read corpus inputs directly use only these. */
+export const withoutExpectedFailures = (cases: readonly Case[]): Case[] => cases.filter((c) => !(c.id in EXPECTED_FAILURES));
 
 /** Rule 3: a listed id that is not in the corpus. Throws. */
 export function checkListedIds(expected: ExpectedFailures, cases: readonly Case[]): void {

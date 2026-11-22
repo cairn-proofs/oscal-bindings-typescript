@@ -195,6 +195,15 @@ jobs:
             echo "The tag ${TAG} points at ${GITHUB_SHA}, which is not on main." >&2
             exit 1
           fi
+      # README.md states that the binding passes the conformance corpus, so a release has no expected failure.
+      - name: Check the expected failures
+        run: |
+          listed="$(node -p 'Object.keys(require("./test/conformance/expected-failures.json")).join("\n")')"
+          if [ -n "${listed}" ]; then
+            echo "test/conformance/expected-failures.json lists cases that the binding does not pass:" >&2
+            echo "${listed}" >&2
+            exit 1
+          fi
   # Builds the package that npm receives. It runs only after the check gate passes for the tagged commit, so npm gets
   # a file from a commit that passed the gate.
   package:

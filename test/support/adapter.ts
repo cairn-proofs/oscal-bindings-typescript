@@ -6,7 +6,17 @@
 
 import { buildHash, buildResource, buildRlink, type ResourceOptions, type RlinkOptions } from "../../src/backmatter.ts";
 import { OscalDoc } from "../../src/document.ts";
-import { OscalError, ParseError } from "../../src/errors.ts";
+import {
+  AccessError,
+  BuilderError,
+  DocumentTypeMismatchError,
+  LimitExceededError,
+  NotFoundError,
+  OscalError,
+  ParseError,
+  ReadError,
+  UnknownElementTypeError,
+} from "../../src/errors.ts";
 import type { HashAlgorithm, OscalDocument } from "../../src/generated/oscal.ts";
 import {
   isValid,
@@ -21,6 +31,7 @@ import {
   parseProfile,
   parseSystemSecurityPlan,
   parseYaml,
+  parseYamlFile,
 } from "../../src/parse.ts";
 import { serialize, serializeYaml } from "../../src/serialize.ts";
 import { supportedElementTypes, validateElement } from "../../src/validate-element.ts";
@@ -52,6 +63,18 @@ function notImplemented(operation: string): never {
 /** The corpus error categories (cases.json, `categories`). */
 export type Category = string;
 
+/** The error class of each category. An error is in the category when it is an instance of the class. */
+const categoryClasses: Record<Category, abstract new (...args: never[]) => OscalError> = {
+  "parse-error": ParseError,
+  "document-type-mismatch": DocumentTypeMismatchError,
+  "not-found": NotFoundError,
+  "read-error": ReadError,
+  "access-error": AccessError,
+  "unknown-element-type": UnknownElementTypeError,
+  "limit-exceeded": LimitExceededError,
+  "builder-error": BuilderError,
+};
+
 /** FAC-002: the values that the facade reads. */
 export interface FacadeView {
   wrapper: unknown;
@@ -78,6 +101,8 @@ export interface Adapter {
   parseTyped(documentType: string, input: string | Uint8Array): unknown;
   /** PRS-002: the parse of a file path. */
   parseFile(path: string): unknown;
+  /** YML-006: the parse of a YAML file path. */
+  parseYamlFile(path: string): unknown;
   /** The JSON serialization of a parsed document. */
   serialize(document: unknown): string;
   /** ERR-002: the non-raising validity check. */
@@ -87,7 +112,7 @@ export interface Adapter {
   /** ELV-002: the list of supported element-type names. */
   elementTypes(): readonly string[];
   /** FAC-004: the assessment period accessor on the facade of a parsed document. */
-  assessmentPeriod(document: unknown): { start: string | undefined; end: string | undefined };
+  assessmentPeriod(document: unknown): { start: string | null | undefined; end: string | null | undefined };
   /** YML-005: the parse of YAML text or bytes. */
   parseYaml(input: string | Uint8Array): unknown;
   /** YML-008: the serialization to YAML. */
@@ -106,6 +131,8 @@ export interface Adapter {
   buildResource(args: { key?: string; title?: string; identifier?: string; "document-ids"?: unknown[] }): unknown;
   /** The corpus category of an error that an operation threw. */
   category(error: unknown): Category;
+  /** ERR-009: whether the error is in the category, which includes each descendant of the category. */
+  inCategory(error: unknown, category: Category): boolean;
   /** The count of structured failure entries of a parse error. */
   failureCount(error: unknown): number;
 }
@@ -118,6 +145,7 @@ export const adapter: Adapter = {
     return parser(input);
   },
   parseFile,
+  parseYamlFile,
   serialize: (document) => serialize(document as OscalDocument),
   isValid,
   validateElement: (elementType, value) => validateElement(elementType, value).valid,
@@ -134,6 +162,12 @@ export const adapter: Adapter = {
   category: (error) => {
     if (error instanceof OscalError) return error.category;
     throw error;
+  },
+  inCategory: (error, category) => {
+    if (!(error instanceof OscalError)) throw error;
+    const errorClass = categoryClasses[category];
+    if (errorClass === undefined) throw new Error(`${category} is not a category`);
+    return error instanceof errorClass;
   },
   failureCount: (error) => (error instanceof ParseError ? error.failures.length : 0),
 };

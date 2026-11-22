@@ -12,8 +12,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
-export const SPEC_ARTIFACT_VERSION = "0.8.0+oscal.1.2.3";
-export const SPEC_ARTIFACT_SHA256 = "3da20cc6127e033d82e47046435caefe2b3a7ad7554908da264e5f4fe7f48dda";
+export const SPEC_ARTIFACT_VERSION = "0.9.0+oscal.1.2.3";
+export const SPEC_ARTIFACT_SHA256 = "852c1d7d675cb1b4de39d7ac65b546fc79e38c42518520488546364f268a4832";
 /** The OSCAL release, from the build metadata of the version. */
 export const OSCAL_RELEASE = SPEC_ARTIFACT_VERSION.split("+oscal.")[1];
 

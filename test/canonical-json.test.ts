@@ -1,5 +1,5 @@
 // The cases are a copy of scripts/check-canonical-json.ts of cairn-proofs/oscal-bindings-specs at the tag
-// v0.8.0+oscal.1.2.3.
+// v0.9.0+oscal.1.2.3.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -46,6 +46,35 @@ const cases: Array<[string, () => string, string]> = [
     '{"value":"2024-01-02T03:04:05.10+00:00"}',
   ],
   ["port-range end is a number", () => canonicalize('{"end":443}'), '{"end":443}'],
+  // SER-004: two outputs of the same document are equivalent when their canonical forms are the same bytes.
+  [
+    "SER-004.02: a different key order gives the same canonical form",
+    () =>
+      canonicalize('{"b":1,"a":{"d":2,"c":[3,{"f":4,"e":5}]}}') ===
+      canonicalize('{"a":{"c":[3,{"e":5,"f":4}],"d":2},"b":1}')
+        ? "equivalent"
+        : "different",
+    "equivalent",
+  ],
+  [
+    "SER-004.02: a different array order gives another canonical form",
+    () => (canonicalize('{"a":[1,2]}') === canonicalize('{"a":[2,1]}') ? "equivalent" : "different"),
+    "different",
+  ],
+  [
+    "SER-004.03: different whitespace gives the same canonical form",
+    () =>
+      canonicalize('{"a":[1,2],"b":{"c":"d e"}}') ===
+      canonicalize('{\n\t"a" : [ 1,\r\n 2 ] ,\n  "b": { "c" : "d e" }\n}\n')
+        ? "equivalent"
+        : "different",
+    "equivalent",
+  ],
+  [
+    "SER-004.03: whitespace inside a string value is kept",
+    () => (canonicalize('{"a":"d e"}') === canonicalize('{"a":"d  e"}') ? "equivalent" : "different"),
+    "different",
+  ],
 ];
 
 for (const [name, run, want] of cases) {
