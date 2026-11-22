@@ -89,3 +89,23 @@ test("parallel misses publish once and never remove a published directory", asyn
   for (const root of roots) assert.ok(fs.existsSync(path.join(root, "manifest", "names.json")));
   assert.deepEqual(fs.readdirSync(cacheRoot), [path.basename(roots[0])]);
 });
+
+test("a complete cache folder that was built with another list of members is not reused", async () => {
+  const { bytes, pin, cacheRoot } = fixture();
+  const old = await ensureSpecArtifact({ pin, cacheRoot, download: async () => bytes });
+  assert.ok(!fs.existsSync(path.join(old, "manifest", "unused.json")));
+
+  const wider: Pin = { ...pin, members: [...pin.members, "manifest/unused.json"] };
+  let calls = 0;
+  const root = await ensureSpecArtifact({
+    pin: wider,
+    cacheRoot,
+    download: async () => {
+      calls += 1;
+      return bytes;
+    },
+  });
+  assert.equal(calls, 1);
+  assert.notEqual(root, old);
+  assert.ok(fs.existsSync(path.join(root, "manifest", "unused.json")));
+});

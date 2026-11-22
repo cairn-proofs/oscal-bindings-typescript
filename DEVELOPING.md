@@ -12,6 +12,12 @@ The toolchain includes `actionlint`. Run `actionlint` after a change to a file i
 The check gate downloads a pinned spec artifact release from cairn-proofs/oscal-bindings-specs over HTTPS. The pin is
 release `v0.9.0+oscal.1.2.3`, and `scripts/spec-artifact.ts` holds its sha256. A change that moves the pin also sets `version` in `spec-pin.json`, which
 the spec-pin badge of the README reads. `test/spec-pin.test.ts` fails when the two differ.
+
+`npm run generate` reads two manifests of the artifact: the naming manifest `names.json`, and the constraint manifest
+`constraints.json`. It copies the schema and the constraint manifest into `src/generated/`. It stops when the constraint
+manifest does not conform to its JSON Schema, when its `format` is not 1, or when its `oscal-release` is not the release
+of the pin.
+
 ## API reference
 `npm run docs` builds the API reference with TypeDoc into `api-docs/site/`. TypeDoc does not support the TypeScript 7 of
 the root package, so `api-docs/` is a separate package with its own `package.json`, its own lockfile and its own

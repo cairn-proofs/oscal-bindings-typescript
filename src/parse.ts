@@ -3,7 +3,8 @@
  * the operation at its first failure, so the binding does no more work on input that is known to be invalid.
  */
 import fs from "node:fs";
-import { NotFoundError, ParseError, ReadError } from "./errors.ts";
+import { constraintFailures } from "./constraints.ts";
+import { type FailureEntry, NotFoundError, ParseError, ReadError } from "./errors.ts";
 import type {
   AssessmentPlanDocument,
   AssessmentResultsDocument,
@@ -45,12 +46,24 @@ function read(input: Input, expected?: string): { value: unknown; rootKey: strin
   return { value, rootKey: rootKeyOf(value, expected) };
 }
 
-/** The pipeline of every parse operation. The typed parsers pass the expected root key. */
+/**
+ * The pipeline of every parse operation. The typed parsers pass the expected root key. A document that conforms to the
+ * schema also has to meet the constraint manifest (PRS-015). A document that fails the schema gets no constraint entry.
+ */
 function parseInput(input: Input, expected?: string): unknown {
   const { value, rootKey } = read(input, expected);
-  if (passes(documentValidators(rootKey).failFast, value)) return value;
-  const failures = collectSelected(documentValidators(rootKey).full, value);
-  throw new ParseError(`the ${rootKey} document is not valid at ${failures.length} location(s)`, failures);
+  if (!passes(documentValidators(rootKey).failFast, value)) {
+    const failures = collectSelected(documentValidators(rootKey).full, value);
+    throw new ParseError(`the ${rootKey} document is not valid at ${failures.length} location(s)`, failures);
+  }
+  const broken = constraintFailures(value);
+  if (broken.length === 0) return value;
+  const failures = broken.map(({ id, location }): FailureEntry => ({
+    location,
+    messages: [`the constraint ${id} fails`],
+    constraint: id,
+  }));
+  throw new ParseError(`the ${rootKey} document breaks ${failures.length} constraint(s)`, failures);
 }
 
 /** Reads an OSCAL document of any type from JSON text or UTF-8 bytes (PRS-001). Throws a `ParseError`. */
@@ -104,7 +117,7 @@ export function parseYamlFile(path: string): OscalDocument {
 export function isValid(input: string | Uint8Array): boolean {
   try {
     const { value, rootKey } = read(input);
-    return passes(documentValidators(rootKey).failFast, value);
+    return passes(documentValidators(rootKey).failFast, value) && constraintFailures(value).length === 0;
   } catch {
     return false;
   }

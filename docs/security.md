@@ -20,7 +20,9 @@ input costs more than the same document in JSON. A small YAML input can read as 
 `alias-expansion`: 10,000,000 characters of scalar text are about 20 MB of memory. A valid YAML document that holds a
 number or a boolean costs more than its JSON form. The check of the tree of text fails, and the collecting check then
 runs one time or more. The JSON checks run again on the result. A document with no number and no boolean has no
-conversion pass.
+conversion pass. A valid document also gets the check of the constraint manifest. This check adds a cost that grows
+with the size of the document. For a catalog of 10 MiB it adds about 70 ms, and a document of 22 KiB or less takes
+less than 1 ms. [PERFORMANCE.md](../PERFORMANCE.md) has the numbers.
 **What you lose.** Your service can become unavailable.
 
 **What to do.**

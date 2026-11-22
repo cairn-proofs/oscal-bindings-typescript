@@ -22,6 +22,7 @@ class FakeError extends Error {
     readonly category: string,
     readonly count: number,
     message: string,
+    readonly constraints: string[] = [],
   ) {
     super(message);
   }
@@ -36,7 +37,7 @@ function conforming(c: Case): Adapter {
   /** The one document that each parse of a passing case returns. The serializer gives the expected JSON for it only. */
   const marker = { marker: true };
   const fail = (): never => {
-    throw new FakeError(c["expected-category"] as string, c["expected-min-failures"] ?? 1, `fails at ${path.join(corpus.dir, c.input)}`);
+    throw new FakeError(c["expected-category"] as string, c["expected-min-failures"] ?? 1, `fails at ${path.join(corpus.dir, c.input)}`, c["expected-constraints"]);
   };
   const expectedJson = () => fs.readFileSync(path.join(corpus.dir, c.expected as string), "utf8");
   const throwing = c["expected-category"] !== undefined;
@@ -76,6 +77,8 @@ function conforming(c: Case): Adapter {
     category: (error) => (error as FakeError).category,
     inCategory: (error, category) => inTree((error as FakeError).category, category),
     failureCount: (error) => (error as FakeError).count,
+    constraintIds: (error) => [...(error as FakeError).constraints],
+    limitOf: () => undefined,
   };
 }
 
@@ -355,6 +358,21 @@ const changes: Array<[string, Case, (a: Adapter, c: Case) => Partial<Adapter>]> 
     byId("parse-typed/wrong-document-type"),
     (a) => ({ inCategory: (e, category) => category !== "parse-error" && a.inCategory(e, category) }),
   ],
+  [
+    "parse: one constraint id less",
+    byId("parse/constraint/oscal-catalog-metadata-prop-name"),
+    (a) => ({ constraintIds: (e) => a.constraintIds(e).slice(1) }),
+  ],
+  [
+    "parse: one constraint id more",
+    byId("parse/constraint/oscal-catalog-metadata-prop-name"),
+    (a) => ({ constraintIds: (e) => [...a.constraintIds(e), "oscal-catalog-metadata-prop-name"] }),
+  ],
+  [
+    "parse: one of two repeats of a constraint id less",
+    byId("parse/constraint/oscal-metadata-prop-name-values-metadata"),
+    (a) => ({ constraintIds: (e) => a.constraintIds(e).slice(1) }),
+  ],
   ["yaml-parse: no error", firstOf("yaml-parse"), () => ({ parseYaml: () => ({}) })],
   ["yaml-parse: wrong category", firstOf("yaml-parse"), () => ({ category: () => "other" })],
 ];
@@ -366,6 +384,21 @@ for (const [name, c, change] of changes) {
     assert.throws(() => runCase(changed, corpus.dir, c));
   });
 }
+
+test("the same constraint ids in another order pass", () => {
+  const c = byId("parse/constraint/oscal-metadata-prop-name-values-metadata");
+  const base = conforming(c);
+  runCase({ ...base, constraintIds: (e) => base.constraintIds(e).reverse() }, corpus.dir, c);
+  const mixed = byId("parse/constraint/oscal-catalog-metadata-prop-name");
+  const mixedBase = conforming(mixed);
+  runCase({ ...mixedBase, constraintIds: (e) => mixedBase.constraintIds(e).reverse() }, corpus.dir, mixed);
+});
+
+test("a parse error that identifies a limit passes with a list of constraint ids that differs", () => {
+  const c = byId("parse/constraint/oscal-catalog-metadata-prop-name");
+  const base = conforming(c);
+  runCase({ ...base, limitOf: () => "nesting-depth", constraintIds: () => [] }, corpus.dir, c);
+});
 
 test("the runner normalizes a bound of an assessment period before it compares the bound", () => {
   const c = byId("assessment-period/mixed-offsets");
