@@ -112,7 +112,7 @@ test("YML-009.01 an alias is read at its own location", () => {
   const input = componentDefinition(
     "            - {start: &n 443, end: 443}",
     "",
-    "      props:\n        - {name: a, value: *n}",
+    "      props:\n        - {name: a, ns: 'https://example.com/ns', value: *n}",
   );
   const component = (parseYaml(input) as ComponentDefinitionDocument)["component-definition"].components?.[0];
   assert.equal(component?.protocols?.[0]["port-ranges"]?.[0].start, 443);

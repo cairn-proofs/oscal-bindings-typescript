@@ -17,12 +17,18 @@ export type ErrorCategory =
 /** The documented limits of the binding (ERR-010). */
 export type Limit = "nesting-depth" | "alias-expansion";
 
-/** One failing location of a schema failure (PRS-006, design.md D5). */
+/**
+ * One failure of a parse: a failing location of a schema failure (PRS-006, design.md D5), or one constraint failure
+ * (PRS-015). A schema failure has one entry for each failing location. A constraint failure has its own entry, so
+ * several entries can have the same location.
+ */
 export interface FailureEntry {
   /** A JSON Pointer from the root of the input. */
   readonly location: string;
   /** The messages of that location, in the order of the validator errors. */
   readonly messages: readonly string[];
+  /** The `id` of the manifest entry that failed. Only a constraint failure has it. A schema failure has none. */
+  readonly constraint?: string;
 }
 
 /** The base class of each error that an operation of the binding throws on purpose. */
@@ -44,7 +50,10 @@ export class OscalError extends Error {
  * schema.
  */
 export class ParseError extends OscalError {
-  /** One entry for each failing location. The array is empty when the failure has no schema location. */
+  /**
+   * One entry for each failing schema location, or one entry for each constraint failure. The array is empty when the
+   * failure has no location.
+   */
   readonly failures: readonly FailureEntry[];
 
   constructor(
@@ -77,7 +86,10 @@ export class LimitExceededError extends OscalError {
 
 /** A back-matter builder received invalid input (ERR-013). It is not a parse error. */
 export class BuilderError extends OscalError {
-  /** One entry for each failing location. The array is empty when the failure has no schema location. */
+  /**
+   * One entry for each failing schema location, or one entry for each constraint failure. The array is empty when the
+   * failure has no location.
+   */
   readonly failures: readonly FailureEntry[];
 
   constructor(message: string, failures: readonly FailureEntry[] = []) {

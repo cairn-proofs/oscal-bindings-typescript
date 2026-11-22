@@ -31,6 +31,8 @@ export const MEMBERS = [
   `schemas/${OSCAL_RELEASE}/oscal_complete_schema.json`,
   `manifest/${OSCAL_RELEASE}/names.json`,
   "manifest/names.schema.json",
+  `manifest/${OSCAL_RELEASE}/constraints.json`,
+  "manifest/constraints.schema.json",
   `corpus/${OSCAL_RELEASE}`,
   "openspec/requirements.json",
   "openspec/traceability.schema.json",
@@ -85,7 +87,9 @@ export async function ensureSpecArtifact(options: EnsureOptions = {}): Promise<s
   const pin = options.pin ?? PIN;
   const cacheRoot = options.cacheRoot ?? DEFAULT_CACHE_ROOT;
   const download = options.download ?? httpsDownload;
-  const target = path.join(cacheRoot, `${pin.version}-${pin.sha256.slice(0, 12)}`);
+  // The folder name holds a short hash of the member list, so a cache that was built with another list is not reused.
+  const membersHash = sha256(Buffer.from(JSON.stringify(pin.members))).slice(0, 8);
+  const target = path.join(cacheRoot, `${pin.version}-${pin.sha256.slice(0, 12)}-${membersHash}`);
   if (fs.existsSync(path.join(target, ".complete"))) return target;
 
   const bytes = await download(pin.url);
@@ -133,6 +137,8 @@ export function artifactPaths(root: string) {
     schema: path.join(root, "schemas", OSCAL_RELEASE, "oscal_complete_schema.json"),
     names: path.join(root, "manifest", OSCAL_RELEASE, "names.json"),
     namesSchema: path.join(root, "manifest", "names.schema.json"),
+    constraints: path.join(root, "manifest", OSCAL_RELEASE, "constraints.json"),
+    constraintsSchema: path.join(root, "manifest", "constraints.schema.json"),
     corpus: path.join(root, "corpus", OSCAL_RELEASE),
     documents: path.join(root, "corpus", OSCAL_RELEASE, "documents"),
     cases: path.join(root, "corpus", OSCAL_RELEASE, "cases.json"),

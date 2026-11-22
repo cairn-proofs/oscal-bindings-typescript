@@ -13,7 +13,7 @@
 Typed TypeScript data bindings for [OSCAL](https://pages.nist.gov/OSCAL/) (Open Security Controls Assessment Language) v1.2.3, generated from the NIST JSON Schema and the naming manifest of [cairn-proofs/oscal-bindings-specs](https://github.com/cairn-proofs/oscal-bindings-specs).
 
 - **Every OSCAL document type.** Catalog, Profile, Component Definition, System Security Plan, Assessment Plan, Assessment Results, Plan of Action and Milestones, and Mapping Collection, each with a typed parser.
-- **Strict input.** A parse rejects unknown fields and values that break an OSCAL pattern, and reports each failure with its location.
+- **Strict input.** A parse rejects unknown fields and values that break an OSCAL pattern. It also rejects a document that breaks an OSCAL constraint, for example a property name that OSCAL does not allow. It reports each failure with its location.
 - **JSON and YAML.** Read and write both. A YAML document gives the same result as the same document in JSON.
 - **Measured performance.** [PERFORMANCE.md](https://github.com/cairn-proofs/oscal-bindings-typescript/blob/main/PERFORMANCE.md) has the parse, serialize, and memory costs.
 - **Three runtime dependencies.** `ajv`, `ajv-formats`, and `yaml`. One entry point, `oscal-bindings/v1`.

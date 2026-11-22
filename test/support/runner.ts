@@ -22,6 +22,8 @@ export interface Case {
   "expected-valid"?: boolean;
   "expected-min-failures"?: number;
   "expected-max-failures"?: number;
+  /** The `id` of each constraint failure, with each repeat. The order is not fixed. */
+  "expected-constraints"?: string[];
   arguments?: Record<string, unknown>;
   "expected-period"?: { start: string | null; end: string | null };
   "expected-absent-keys"?: string[];
@@ -107,6 +109,17 @@ function reportsIn(corpusDir: string, adapter: Adapter, c: Case, category: strin
   return error;
 }
 
+/**
+ * The corpus README rule of `expected-constraints` (design D8): when the error identifies no limit, the sorted `id`
+ * values of its constraint failures equal the sorted list, with each repeat. The operations `validate-element`,
+ * `build-hash` and `build-resource` also have such cases. Their rules come with the change for element validation.
+ */
+function checkConstraints(adapter: Adapter, c: Case, error: unknown): void {
+  const expected = c["expected-constraints"];
+  if (expected === undefined || adapter.limitOf(error) !== undefined) return;
+  assert.deepEqual(adapter.constraintIds(error).sort(), [...expected].sort(), `${c.id}: wrong constraint failures`);
+}
+
 function checkFailureCount(adapter: Adapter, c: Case, error: unknown): void {
   const count = adapter.failureCount(error);
   const min = c["expected-min-failures"];
@@ -187,6 +200,7 @@ export function runCase(adapter: Adapter, corpusDir: string, c: Case): void {
       const error = reports(adapter, c, category, () => adapter.parse(input));
       assert.equal(adapter.isValid(input), false, `${c.id}: isValid must be false`);
       checkFailureCount(adapter, c, error);
+      checkConstraints(adapter, c, error);
       return;
     }
     case "parse-typed": {

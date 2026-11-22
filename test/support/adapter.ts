@@ -135,6 +135,10 @@ export interface Adapter {
   inCategory(error: unknown, category: Category): boolean;
   /** The count of structured failure entries of a parse error. */
   failureCount(error: unknown): number;
+  /** PRS-015: the `constraint` of each failure entry of a parse error that has one. */
+  constraintIds(error: unknown): string[];
+  /** ERR-010: the `limit` of the error, or `undefined` when no limit stopped the operation. */
+  limitOf(error: unknown): string | undefined;
 }
 
 export const adapter: Adapter = {
@@ -170,4 +174,7 @@ export const adapter: Adapter = {
     return error instanceof errorClass;
   },
   failureCount: (error) => (error instanceof ParseError ? error.failures.length : 0),
+  constraintIds: (error) =>
+    error instanceof ParseError ? error.failures.flatMap((f) => (f.constraint === undefined ? [] : [f.constraint])) : [],
+  limitOf: (error) => (error instanceof OscalError ? error.limit : undefined),
 };

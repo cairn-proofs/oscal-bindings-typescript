@@ -23,7 +23,9 @@ give more than 100,000 nodes, or more than 10,000,000 characters of scalar text.
 nested alias gives. The error is a `ParseError` with no entries, and its `limit` property is `alias-expansion`. A caller
 cannot change the limit. The binding has no limit on the size of a YAML input in bytes.
 
-A `ParseError` has no limit on its entries. It carries one entry for each failing location.
+A `ParseError` has no limit on its entries. It carries one entry for each failing schema location and one entry for each
+constraint failure. A constraint failure has the `id` of its manifest entry in `constraint`. Two constraint failures of
+one location give two entries.
 
 ## Regex patterns
 

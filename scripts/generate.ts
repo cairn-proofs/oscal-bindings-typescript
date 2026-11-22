@@ -6,7 +6,7 @@
  * and the generator fails with the list of every gap.
  *
  * It also writes the runtime inputs of the validators (design.md D2): a copy of the schema, and the table of element
- * types.
+ * types. It copies the constraint manifest after it checks the manifest (design D7 of evaluate-constraint-manifest).
  *
  * Usage: `tsx scripts/generate.ts` checks that each generated file is the current output.
  *        `tsx scripts/generate.ts --write` writes them.
@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
+import { Ajv } from "ajv";
 import {
   childPointer,
   type Entry,
@@ -31,6 +32,34 @@ export const OUTPUT = path.resolve("src/generated/oscal.ts");
 export const SCHEMA_OUTPUT = path.resolve("src/generated/oscal-complete-schema.json");
 export const ELEMENT_TYPES_OUTPUT = path.resolve("src/generated/element-types.ts");
 export const RELEASE_OUTPUT = path.resolve("src/generated/release.ts");
+export const CONSTRAINTS_OUTPUT = path.resolve("src/generated/constraints.json");
+
+/** The constraint manifest formats that the evaluator of `src/constraints.ts` reads. */
+const SUPPORTED_CONSTRAINT_FORMATS: readonly number[] = [1];
+
+/**
+ * The problems of a constraint manifest (design D7): it does not conform to its JSON Schema, its `format` is not 1, or
+ * its `oscal-release` is not the release of the pin. Returns one message for each problem. The array is empty when the
+ * manifest passes all three checks.
+ */
+export function constraintManifestProblems(manifest: unknown, constraintsSchema: object, release: string): string[] {
+  const problems: string[] = [];
+  const ajv = new Ajv({ allErrors: true, strict: false });
+  const validate = ajv.compile(constraintsSchema);
+  if (!validate(manifest)) {
+    for (const error of validate.errors ?? []) {
+      problems.push(`constraints.json does not conform to constraints.schema.json: ${error.instancePath || "/"} ${error.message}`);
+    }
+  }
+  const record = isObject(manifest) ? manifest : {};
+  if (typeof record.format !== "number" || !SUPPORTED_CONSTRAINT_FORMATS.includes(record.format)) {
+    problems.push(`constraints.json has format ${JSON.stringify(record.format)}. Supported: ${SUPPORTED_CONSTRAINT_FORMATS.join(", ")}.`);
+  }
+  if (record["oscal-release"] !== release) {
+    problems.push(`constraints.json has oscal-release ${JSON.stringify(record["oscal-release"])}. The pin has ${release}.`);
+  }
+  return problems;
+}
 /** The text of `src/generated/release.ts`: the OSCAL release of the spec pin (VER-002, design D3). */
 export const releaseModule = (release: string) =>
   [
@@ -404,14 +433,30 @@ export function generate(schema: Json, manifest: Manifest): GenerateResult {
 }
 
 /** Reads the pinned artifact, validates the manifest, and generates. Throws with every failure. */
-export async function generateFromArtifact(): Promise<GenerateResult & { schemaBytes: Buffer }> {
+export async function generateFromArtifact(): Promise<
+  GenerateResult & { schemaBytes: Buffer; constraintsBytes: Buffer }
+> {
   const paths = artifactPaths(await ensureSpecArtifact());
   const schemaBytes = fs.readFileSync(paths.schema);
   const manifest = JSON.parse(fs.readFileSync(paths.names, "utf8")) as unknown;
   const namesSchema = JSON.parse(fs.readFileSync(paths.namesSchema, "utf8")) as object;
   const failures = validateManifest({ manifest, namesSchema, schemaBytes, release: OSCAL_RELEASE });
   if (failures.length) throw new Error(`names.json is invalid. No code generated.\n${failures.join("\n")}`);
-  return { ...generate(JSON.parse(schemaBytes.toString("utf8")) as Json, manifest as Manifest), schemaBytes };
+  const constraintsBytes = fs.readFileSync(paths.constraints);
+  const constraintsSchema = JSON.parse(fs.readFileSync(paths.constraintsSchema, "utf8")) as object;
+  const constraintProblems = constraintManifestProblems(
+    JSON.parse(constraintsBytes.toString("utf8")) as unknown,
+    constraintsSchema,
+    OSCAL_RELEASE,
+  );
+  if (constraintProblems.length) {
+    throw new Error(`constraints.json is invalid. No code generated.\n${constraintProblems.join("\n")}`);
+  }
+  return {
+    ...generate(JSON.parse(schemaBytes.toString("utf8")) as Json, manifest as Manifest),
+    schemaBytes,
+    constraintsBytes,
+  };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
@@ -429,6 +474,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     { path: SCHEMA_OUTPUT, content: result.schemaBytes },
     { path: ELEMENT_TYPES_OUTPUT, content: result.elementTypes },
     { path: RELEASE_OUTPUT, content: releaseModule(OSCAL_RELEASE) },
+    { path: CONSTRAINTS_OUTPUT, content: result.constraintsBytes },
   ];
   const shown = (file: string) => path.relative(process.cwd(), file);
   if (write) {

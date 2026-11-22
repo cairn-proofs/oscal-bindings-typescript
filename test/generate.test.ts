@@ -2,17 +2,21 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { before, test } from "node:test";
-import { elementTypeName, generate, validationPointer, yamlTypingProblems } from "../scripts/generate.ts";
+import { constraintManifestProblems, elementTypeName, generate, validationPointer, yamlTypingProblems } from "../scripts/generate.ts";
 import type { Json, Manifest } from "../scripts/manifest.ts";
 import { artifactPaths, ensureSpecArtifact } from "../scripts/spec-artifact.ts";
 
 let schema: Json;
 let manifest: Manifest;
+let constraints: Record<string, unknown>;
+let constraintsSchema: object;
 
 before(async () => {
   const paths = artifactPaths(await ensureSpecArtifact());
   schema = JSON.parse(fs.readFileSync(paths.schema, "utf8")) as Json;
   manifest = JSON.parse(fs.readFileSync(paths.names, "utf8")) as Manifest;
+  constraints = JSON.parse(fs.readFileSync(paths.constraints, "utf8")) as Record<string, unknown>;
+  constraintsSchema = JSON.parse(fs.readFileSync(paths.constraintsSchema, "utf8")) as object;
 });
 
 test("the released manifest covers every place: zero gaps and zero problems", () => {
@@ -144,4 +148,29 @@ test("the committed element-type table is the generator output", () => {
 test("the committed schema copy has the sha256 of the manifest", () => {
   const actual = createHash("sha256").update(fs.readFileSync("src/generated/oscal-complete-schema.json")).digest("hex");
   assert.equal(actual, manifest.schema.sha256);
+});
+
+test("the released constraint manifest passes the three checks", () => {
+  assert.deepEqual(constraintManifestProblems(constraints, constraintsSchema, "1.2.3"), []);
+});
+
+test("a constraint manifest that does not conform to its JSON Schema fails the run", () => {
+  const broken = { ...constraints, entries: "none" };
+  const problems = constraintManifestProblems(broken, constraintsSchema, "1.2.3");
+  assert.ok(problems.some((p) => p.includes("does not conform to constraints.schema.json")), problems.join("\n"));
+});
+
+test("a constraint manifest with a format other than 1 fails the run", () => {
+  const problems = constraintManifestProblems({ ...constraints, format: 2 }, constraintsSchema, "1.2.3");
+  assert.ok(problems.some((p) => p.includes("has format 2")), problems.join("\n"));
+});
+
+test("a constraint manifest for another OSCAL release fails the run", () => {
+  const problems = constraintManifestProblems({ ...constraints, "oscal-release": "1.2.4" }, constraintsSchema, "1.2.3");
+  assert.ok(problems.some((p) => p.includes('oscal-release "1.2.4"')), problems.join("\n"));
+});
+
+test("the committed constraint manifest has the bytes of the released manifest", async () => {
+  const paths = artifactPaths(await ensureSpecArtifact());
+  assert.ok(fs.readFileSync("src/generated/constraints.json").equals(fs.readFileSync(paths.constraints)));
 });
