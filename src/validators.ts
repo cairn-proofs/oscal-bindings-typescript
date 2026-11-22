@@ -6,9 +6,9 @@
  * only files of the repo.
  */
 import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
-import addFormats from "ajv-formats";
+import { datatypeGrammarMessages, datatypeGrammars } from "./datatypes.ts";
 import { type ElementType, elementTypes, type UnionSite, unionSites } from "./generated/element-types.ts";
-import schema from "./generated/oscal-complete-schema.json" with { type: "json" };
+import importedSchema from "./generated/oscal-complete-schema.json" with { type: "json" };
 import { DocumentTypeMismatchError, type FailureEntry, ParseError } from "./errors.ts";
 
 export { type ElementType, elementTypes };
@@ -55,16 +55,68 @@ export function regExpEngine(pattern: string, flags: string): RegExp {
 regExpEngine.code = "regExpEngine";
 
 /**
+ * The keyword that carries the grammar of a datatype (PRS-016 to PRS-019, design D1). The copy of the schema holds it
+ * on each node that has a `format` keyword, with the value of that `format`.
+ */
+const GRAMMAR_KEYWORD = "datatype-grammar";
+
+/**
+ * A copy of the imported schema. Each node with a string `format` value also has the `datatype-grammar` keyword, with
+ * the same value. Throws when a value has no grammar in `datatypes.ts`. Ajv, `nodeAt`, `branchPointers` and
+ * `siteVariants` all read this one copy, so the identity of the nodes holds.
+ */
+const schema: typeof importedSchema = (() => {
+  const copy = structuredClone(importedSchema);
+  const visit = (node: unknown): void => {
+    if (node === null || typeof node !== "object") return;
+    if (Array.isArray(node)) return node.forEach(visit);
+    const record = node as Record<string, unknown>;
+    if (typeof record.format === "string") {
+      if (!Object.hasOwn(datatypeGrammars, record.format)) {
+        throw new Error(`the schema has the format ${record.format}, and datatypes.ts has no grammar for it`);
+      }
+      record[GRAMMAR_KEYWORD] = record.format;
+    }
+    Object.values(record).forEach(visit);
+  };
+  visit(copy);
+  return copy;
+})();
+
+/**
  * One factory sets the options of both Ajv instances, so the options cannot differ by mistake. Only `allErrors`
  * differs (design D3). `verbose` adds `parentSchema` and `data` to each error, so a parse error can find the nested
  * union site of an error and the object at the site (PRS-014). `strictTypes` is off, because the schema sets a
  * `pattern` on a number (DecimalDatatype), and the default value makes Ajv write a warning to the console. The default
  * `unicodeRegExp` passes the `u` flag to the pattern engine, so `\p{L}` and `\p{N}` keep their XSD meaning (PRS-007).
+ * `validateFormats` is off, so `format` is an annotation and decides no result (PRS-016). The keyword of
+ * `GRAMMAR_KEYWORD` checks the grammar of each datatype instead (PRS-017 to PRS-019).
  */
 function createAjv(allErrors: boolean): Ajv {
-  const ajv = new Ajv({ allErrors, verbose: true, strictTypes: false, code: { regExp: regExpEngine } });
-  // ajv-formats is CommonJS, so under NodeNext the callable is the `default` property of the default import.
-  addFormats.default(ajv, ["date-time", "uri", "uri-reference", "email"]);
+  const ajv = new Ajv({
+    allErrors,
+    verbose: true,
+    strictTypes: false,
+    validateFormats: false,
+    code: { regExp: regExpEngine },
+  });
+  ajv.addKeyword({
+    keyword: GRAMMAR_KEYWORD,
+    type: "string",
+    schemaType: "string",
+    compile: (name: string) => {
+      const grammar = datatypeGrammars[name];
+      const message = datatypeGrammarMessages[name];
+      // Ajv reads `errors` of the function after a call that returns false.
+      const validate: { (data: string): boolean; errors?: Partial<ErrorObject>[] } = (data) => {
+        if (grammar(data)) return true;
+        validate.errors = [{ keyword: GRAMMAR_KEYWORD, params: {}, message }];
+        return false;
+      };
+      return validate;
+    },
+    errors: true,
+  });
   ajv.addSchema(schema);
   return ajv;
 }

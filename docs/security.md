@@ -152,7 +152,7 @@ binding.
 **What to do.**
 
 1. Review every dependency that runs in that process. The runtime dependencies of the binding are
-   `ajv`, `ajv-formats`, and `yaml`.
+   `ajv` and `yaml`.
 2. Deep-freeze a parsed document, or copy it with `structuredClone`, before you share it with other code.
 
 ### Audit
@@ -171,7 +171,7 @@ when it happened. Record the sha256 of the document. Never record the content of
 **Risk.** An attacker can reach you through the way that you install the binding. The attacker can make you install code
 that the maintainer did not release. To do this, the attacker can take a maintainer account, move a branch, rename the
 repository, or publish a look-alike. The attacker can also publish a malicious release of a dependency of `ajv`, for
-example a transitive dependency. Or the attacker can serve a modified `ajv`, `ajv-formats`, or `yaml` from the registry.
+example a transitive dependency. Or the attacker can serve a modified `ajv` or `yaml` from the registry.
 Either action can run attacker code in your process or make the binding accept invalid documents. Without your own
 lockfile, a new install can take such a release.
 
@@ -186,4 +186,4 @@ the schema check.
 3. Install with `npm ci --ignore-scripts`.
 4. Run `npm audit signatures`. It checks the provenance attestation of each release that the release workflow of the
    repository published. Version 0.1.0 was published by hand and has no attestation. Use 0.2.0 or later.
-5. Review each change in `ajv`, `ajv-formats`, `yaml`, and their dependencies when you update.
+5. Review each change in `ajv`, `yaml`, and their dependencies when you update.

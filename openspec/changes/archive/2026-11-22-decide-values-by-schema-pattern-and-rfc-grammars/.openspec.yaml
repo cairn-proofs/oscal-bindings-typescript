@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-11-21
+goal: "Close #67"
+# The contract is in the oscal-bindings-specs store (document-parsing, error-model, schema-versioning). This change
+# consumes it and adds no requirement of its own.
+skip_specs: true

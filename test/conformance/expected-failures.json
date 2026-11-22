@@ -1,6 +1,5 @@
 {
   "build-hash/wrong-length": "#68",
   "build-resource/duplicate-rlink-href": "#68",
-  "element/hash-wrong-length": "#68",
-  "round-trip/email-forms": "#67"
+  "element/hash-wrong-length": "#68"
 }

@@ -253,3 +253,65 @@ test("collectSelected of 4000 failing parameters takes at most 5 times as long a
   const selected = best(() => validators.collectSelected(full, document));
   assert.ok(selected <= 5 * all, `collectSelected took ${selected} ms, and collect took ${all} ms`);
 });
+
+// The `format` keyword is an annotation, and the grammars decide (PRS-016 to PRS-019, design D1 and D5).
+
+test("PRS-016: each format value of the schema has a grammar in datatypes.ts", async () => {
+  const { datatypeGrammars, datatypeGrammarMessages } = await import("../src/datatypes.ts");
+  const formats = new Set<string>();
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node === null || typeof node !== "object") return;
+    const object = node as Record<string, unknown>;
+    if (typeof object.format === "string") formats.add(object.format);
+    Object.values(object).forEach(walk);
+  };
+  walk(schema);
+  assert.ok(formats.size > 0);
+  for (const format of formats) {
+    assert.equal(typeof datatypeGrammars[format], "function", `no grammar for the format ${format}`);
+    assert.equal(typeof datatypeGrammarMessages[format], "string", `no message for the format ${format}`);
+  }
+});
+
+const party = (extra: object) => ({ uuid: "7a3b1c52-0e4d-4f6a-8b9c-2d1e0f3a4b5c", type: "person", ...extra });
+const catalogWithParty = (extra: object) => catalogWith({ metadata: { ...metadata, parties: [party(extra)] } });
+
+test("PRS-016: the format keyword has no effect, so the pattern and the grammar decide an email address", async () => {
+  const { parse } = (await import("../src/parse.ts")) as Parse;
+  // The format check of Ajv rejects both addresses. The schema pattern accepts them, and they hold no control character.
+  for (const address of ["a@b", "用户@例子.广告"]) {
+    assert.doesNotThrow(() => parse(JSON.stringify(catalogWithParty({ "email-addresses": [address] }))), address);
+  }
+});
+
+test("PRS-018: an email address with a control character fails with the message of the grammar", async () => {
+  const failures = await parseFailures(catalogWithParty({ "email-addresses": ["a\u0007@b"] }));
+  const entry = failures.find((f) => f.location === "/catalog/metadata/parties/0/email-addresses/0");
+  assert.ok(entry);
+  // The party is a union site with no distinguishing property, so the entry holds the message once for each branch.
+  assert.ok(entry.messages.length > 0);
+  for (const message of entry.messages) assert.equal(message, "must not hold an ASCII control character");
+});
+
+test("PRS-017: a bad URI reference gives one failure that names the grammar", async () => {
+  const failures = await parseFailures(catalogWith({ metadata: { ...metadata, links: [{ href: "a b" }] } }));
+  assert.deepEqual(failures, [
+    {
+      location: "/catalog/metadata/links/0/href",
+      messages: ["must match the grammar of the RFC 3986 production URI-reference"],
+    },
+  ]);
+});
+
+test("PRS-019: a value must meet the pattern of the schema as well as the grammar of RFC 3339", async () => {
+  const { parse } = (await import("../src/parse.ts")) as Parse;
+  const withDate = (value: string) => catalogWith({ metadata: { ...metadata, "last-modified": value } });
+  assert.doesNotThrow(() => parse(JSON.stringify(withDate("2024-01-02T03:04:05+01:00"))));
+  // The grammar accepts a lower case t, and the pattern does not.
+  const failures = await parseFailures(withDate("2024-01-02t03:04:05Z"));
+  assert.deepEqual(
+    failures.map((f) => f.location),
+    ["/catalog/metadata/last-modified"],
+  );
+});

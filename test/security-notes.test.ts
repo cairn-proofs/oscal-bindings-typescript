@@ -292,13 +292,13 @@ test('security note "Audit": the library source writes no log and no file', () =
   }
 });
 
-test('security note "Install the binding": the package is public, exports only v1, and has three runtime dependencies', () => {
+test('security note "Install the binding": the package is public, exports only v1, and has two runtime dependencies', () => {
   assert.equal(packageJson.name, "oscal-bindings", stale("Install the binding"));
   assert.equal(packageJson.private, undefined, `The package is private. ${stale("Install the binding")}`);
   assert.deepEqual(Object.keys(packageJson.exports), ["./v1"], stale("Install the binding"));
   assert.deepEqual(
     Object.keys(packageJson.dependencies).sort(),
-    ["ajv", "ajv-formats", "yaml"],
+    ["ajv", "yaml"],
     stale("Isolation and shared documents"),
   );
 });
